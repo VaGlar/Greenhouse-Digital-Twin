@@ -10,6 +10,7 @@
   --series-2: #eb6834; /* exterior temp */
   --series-3: #1baf7a; /* CO2 */
   --series-4: #008300; /* yield */
+  --amber: #c47f00;
 
   max-width: 880px;
   margin: 0 auto;
@@ -32,6 +33,7 @@
     --series-2: #d95926;
     --series-3: #199e70;
     --series-4: #0ca30c;
+    --amber: #d9a441;
   }
 }
 
@@ -107,4 +109,165 @@
   font-weight: 600;
   margin: 0 0 8px;
   color: var(--text-secondary);
+}
+
+/* ── Simulation params form ── */
+.form-card {
+  background: var(--surface-1);
+  border: 1px solid var(--gridline);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.form-card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+}
+
+.form-groups {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.form-group-tab {
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--gridline);
+  color: var(--text-secondary);
+}
+
+.form-group-tab.active {
+  background: var(--series-1);
+  border-color: var(--series-1);
+  color: #fff;
+  font-weight: 600;
+}
+
+.form-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px 28px;
+}
+
+.param-slider {
+  margin-bottom: 4px;
+}
+
+.param-slider-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.param-slider-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.param-slider-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.param-slider-value.in-optimal {
+  color: var(--series-4);
+  background: color-mix(in srgb, var(--series-4) 15%, transparent);
+}
+
+.param-slider-value.out-optimal {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 15%, transparent);
+}
+
+.param-slider-track {
+  position: relative;
+  height: 20px;
+}
+
+.param-slider-optimal-band {
+  position: absolute;
+  top: 6px;
+  height: 8px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--series-4) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--series-4) 30%, transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.param-slider-track input[type="range"] {
+  width: 100%;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  outline: none;
+  border: none;
+}
+
+.param-slider-track input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--series-1);
+  cursor: pointer;
+  border: 2px solid var(--surface-1);
+  box-shadow: 0 0 0 1px var(--gridline);
+}
+
+.param-slider-track input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--series-1);
+  cursor: pointer;
+  border: 2px solid var(--surface-1);
+}
+
+.param-slider-range {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.param-slider-optimal-label {
+  color: color-mix(in srgb, var(--series-4) 70%, var(--muted));
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.form-field input[type="text"],
+.form-field input[type="date"] {
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--gridline);
+  background: var(--page);
+  color: var(--text-primary);
 }

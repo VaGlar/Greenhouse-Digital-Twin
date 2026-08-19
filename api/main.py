@@ -7,11 +7,14 @@ edits per run. The frontend only triggers a simulation and reads results.
 
 from __future__ import annotations
 
+import copy
+from datetime import date
 from pathlib import Path
 
 import yaml
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from twin.params import GreenhouseParams
 from twin.simulate import run_simulation
@@ -44,9 +47,49 @@ def get_config() -> dict:
     return _json_safe(raw)
 
 
+class SimulateRequest(BaseModel):
+    """Run-level overrides a user can pick per simulation.
+
+    Structural greenhouse parameters (area, CHP size, geometry) are not
+    here on purpose — they stay in the backend config, see module docstring.
+    All fields optional; anything omitted falls back to the config default.
+    """
+
+    start_date: date | None = None
+    duration_days: int | None = None
+    crop_variety: str | None = None
+    crop_density_plants_per_m2: float | None = None
+    heating_setpoint_day_c: float | None = None
+    heating_setpoint_night_c: float | None = None
+    co2_setpoint_day_ppm: float | None = None
+
+
+def _apply_overrides(raw: dict, overrides: SimulateRequest) -> dict:
+    raw = copy.deepcopy(raw)
+    if overrides.start_date is not None:
+        raw["simulation"]["start_date"] = overrides.start_date
+    if overrides.duration_days is not None:
+        raw["simulation"]["duration_days"] = overrides.duration_days
+    if overrides.crop_variety is not None:
+        raw["crop"]["variety"] = overrides.crop_variety
+    if overrides.crop_density_plants_per_m2 is not None:
+        raw["crop"]["density_plants_per_m2"] = overrides.crop_density_plants_per_m2
+    climate = raw.setdefault("climate_control", {})
+    if overrides.heating_setpoint_day_c is not None:
+        climate["heating_setpoint_day_c"] = overrides.heating_setpoint_day_c
+    if overrides.heating_setpoint_night_c is not None:
+        climate["heating_setpoint_night_c"] = overrides.heating_setpoint_night_c
+    if overrides.co2_setpoint_day_ppm is not None:
+        climate["co2_setpoint_day_ppm"] = overrides.co2_setpoint_day_ppm
+    return raw
+
+
 @app.post("/simulate")
-def simulate() -> dict:
-    params = GreenhouseParams.from_yaml(DEFAULT_CONFIG_PATH)
+def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
+    with open(DEFAULT_CONFIG_PATH, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+    raw = _apply_overrides(raw, overrides)
+    params = GreenhouseParams.from_dict(raw)
     results = run_simulation(params)
 
     daily = (

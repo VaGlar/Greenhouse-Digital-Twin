@@ -10,17 +10,128 @@ import {
   YAxis,
 } from "recharts";
 import "./App.css";
-import { getConfig, runSimulation, type GreenhouseConfig, type SimulationResult } from "./api";
+import { ParamSlider } from "./ParamSlider";
+import {
+  getConfig,
+  runSimulation,
+  type GreenhouseConfig,
+  type SimulationOverrides,
+  type SimulationResult,
+} from "./api";
+
+type SliderKey =
+  | "crop_density_plants_per_m2"
+  | "heating_setpoint_day_c"
+  | "heating_setpoint_night_c"
+  | "co2_setpoint_day_ppm"
+  | "duration_days";
+
+interface SliderDef {
+  key: SliderKey;
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  step: number;
+  optimal?: [number, number];
+}
+
+interface SliderGroup {
+  key: string;
+  label: string;
+  sliders: SliderDef[];
+}
+
+const SLIDER_GROUPS: SliderGroup[] = [
+  {
+    key: "crop",
+    label: "🍅 Καλλιέργεια",
+    sliders: [
+      {
+        key: "crop_density_plants_per_m2",
+        label: "Πυκνότητα φυτών",
+        unit: " φ/m²",
+        min: 2,
+        max: 5,
+        step: 0.25,
+        optimal: [3, 4],
+      },
+    ],
+  },
+  {
+    key: "climate",
+    label: "🌡️ Κλίμα",
+    sliders: [
+      {
+        key: "heating_setpoint_day_c",
+        label: "Θερμοκρασία ημέρας",
+        unit: "°C",
+        min: 16,
+        max: 28,
+        step: 0.5,
+        optimal: [20, 24],
+      },
+      {
+        key: "heating_setpoint_night_c",
+        label: "Θερμοκρασία νύχτας",
+        unit: "°C",
+        min: 10,
+        max: 22,
+        step: 0.5,
+        optimal: [14, 18],
+      },
+      {
+        key: "co2_setpoint_day_ppm",
+        label: "CO₂ ημέρας",
+        unit: " ppm",
+        min: 400,
+        max: 1200,
+        step: 25,
+        optimal: [700, 1000],
+      },
+    ],
+  },
+  {
+    key: "run",
+    label: "📅 Προσομοίωση",
+    sliders: [
+      { key: "duration_days", label: "Διάρκεια", unit: " μέρες", min: 30, max: 300, step: 10 },
+    ],
+  },
+];
+
+const DEFAULT_SLIDER_VALUES: Record<SliderKey, number> = {
+  crop_density_plants_per_m2: 3.5,
+  heating_setpoint_day_c: 20,
+  heating_setpoint_night_c: 17,
+  co2_setpoint_day_ppm: 900,
+  duration_days: 150,
+};
 
 function App() {
   const [config, setConfig] = useState<GreenhouseConfig | null>(null);
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeGroup, setActiveGroup] = useState(SLIDER_GROUPS[0].key);
+  const [sliderValues, setSliderValues] = useState<Record<SliderKey, number>>(DEFAULT_SLIDER_VALUES);
+  const [cropVariety, setCropVariety] = useState("");
+  const [startDate, setStartDate] = useState("");
 
   useEffect(() => {
     getConfig()
-      .then(setConfig)
+      .then((c) => {
+        setConfig(c);
+        setSliderValues({
+          crop_density_plants_per_m2: c.crop.density_plants_per_m2,
+          heating_setpoint_day_c: c.climate_control.heating_setpoint_day_c,
+          heating_setpoint_night_c: c.climate_control.heating_setpoint_night_c,
+          co2_setpoint_day_ppm: c.climate_control.co2_setpoint_day_ppm,
+          duration_days: c.simulation.duration_days,
+        });
+        setCropVariety(c.crop.variety);
+        setStartDate(c.simulation.start_date);
+      })
       .catch((e) => setError(String(e)));
   }, []);
 
@@ -28,7 +139,12 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      setResult(await runSimulation());
+      const overrides: SimulationOverrides = {
+        ...sliderValues,
+        crop_variety: cropVariety || undefined,
+        start_date: startDate || undefined,
+      };
+      setResult(await runSimulation(overrides));
     } catch (e) {
       setError(String(e));
     } finally {
@@ -47,6 +163,63 @@ function App() {
           </p>
         )}
       </header>
+
+      <section className="form-card">
+        <h2>Παράμετροι προσομοίωσης</h2>
+        <div className="form-groups">
+          {SLIDER_GROUPS.map((g) => (
+            <button
+              key={g.key}
+              className={`form-group-tab ${activeGroup === g.key ? "active" : ""}`}
+              onClick={() => setActiveGroup(g.key)}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+
+        {SLIDER_GROUPS.map((g) =>
+          activeGroup !== g.key ? null : (
+            <div className="form-fields" key={g.key}>
+              {g.sliders.map((s) => (
+                <ParamSlider
+                  key={s.key}
+                  label={s.label}
+                  unit={s.unit}
+                  min={s.min}
+                  max={s.max}
+                  step={s.step}
+                  optimal={s.optimal}
+                  value={sliderValues[s.key]}
+                  onChange={(v) => setSliderValues((prev) => ({ ...prev, [s.key]: v }))}
+                />
+              ))}
+              {g.key === "crop" && (
+                <div className="form-field">
+                  <label htmlFor="crop-variety">Ποικιλία</label>
+                  <input
+                    id="crop-variety"
+                    type="text"
+                    value={cropVariety}
+                    onChange={(e) => setCropVariety(e.target.value)}
+                  />
+                </div>
+              )}
+              {g.key === "run" && (
+                <div className="form-field">
+                  <label htmlFor="start-date">Ημερομηνία έναρξης</label>
+                  <input
+                    id="start-date"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          )
+        )}
+      </section>
 
       <button className="run-button" onClick={handleRun} disabled={loading}>
         {loading ? "Τρέχει η προσομοίωση…" : "Run simulation"}
