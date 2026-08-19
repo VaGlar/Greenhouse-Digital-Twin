@@ -116,7 +116,11 @@ class CropParams:
     lai_ramp_days: float = 60.0  # days after planting to reach ~lai_max
     fruiting_start_days: float = 35.0  # days after planting before fruit partitioning begins
     fruiting_ramp_days: float = 20.0  # days to ramp from 0 to full fruit partition fraction
-    fruit_partition_fraction_max: float = 0.6
+    # SOURCED: raised from an earlier 0.6 placeholder to match TOMGRO literature
+    # (Bertin & Gary, 1993 calibration/validation for indeterminate greenhouse
+    # tomato), which reports 80-90% of dry-matter gain to fruit at peak fruiting.
+    # Full audit: docs/assumptions/crop-model.md
+    fruit_partition_fraction_max: float = 0.85
     dry_matter_content_fruit: float = 0.055  # fraction dry matter of fresh tomato fruit
 
     def __post_init__(self) -> None:

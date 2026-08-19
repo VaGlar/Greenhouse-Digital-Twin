@@ -30,9 +30,9 @@ P_MAX_UMOL_M2_LEAF_S = 20.0  # SOURCED, conservative end of the 20-40 umol/m2/s 
 #  journal article, specific page not confirmed, figure taken from search-result summary)
 LIGHT_HALF_SAT_W_M2 = 200.0  # PLACEHOLDER, plausible order of magnitude — not individually sourced
 CO2_HALF_SAT_PPM = 200.0  # PLACEHOLDER, plausible shape (saturates ~1000-1200ppm) — not individually sourced
-T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 24.0, 35.0  # SOURCED but T_MIN/T_OPT run low vs. newer lit.: photosynthesis-
-# specific studies report optimum 25-35C, tomato retains 50% rate even at 47C (Frontiers 10.3389/fpls.2017.00365;
-# researchgate 323225604 review) — T_OPT is a candidate to raise toward ~27-28C, left unchanged for now
+T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 27.0, 35.0  # SOURCED: T_OPT raised from 24C to 27C to match photosynthesis-
+# specific studies reporting optimum 25-35C (tomato retains 50% of photosynthetic rate even at 47C) — Frontiers
+# 10.3389/fpls.2017.00365; researchgate 323225604 review. T_MIN left unchanged (not part of this pass).
 MAINTENANCE_RESPIRATION_FRACTION_PER_DAY = 0.015  # PLACEHOLDER, plausible order of magnitude — not individually sourced
 
 

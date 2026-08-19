@@ -40,8 +40,8 @@ crop:
   lai_ramp_days: 60                # PLACEHOLDER: engineering guess, not sourced
   fruiting_start_days: 35          # PLACEHOLDER: plausible order of magnitude, not individually sourced
   fruiting_ramp_days: 20           # PLACEHOLDER: not sourced
-  fruit_partition_fraction_max: 0.6  # PLACEHOLDER, likely conservative: TOMGRO lit. (Bertin & Gary 1993) reports
-                                    # 80-90% of dry-matter gain to fruit at peak fruiting — candidate to raise, unchanged for now
+  fruit_partition_fraction_max: 0.85  # SOURCED: raised from 0.6 to match TOMGRO lit. (Bertin & Gary 1993),
+                                    # which reports 80-90% of dry-matter gain to fruit at peak fruiting
   dry_matter_content_fruit: 0.055  # SOURCED: ripe tomato fruit dry matter ~5.5% (USDA composition data, 94.5% water)
 
 hydroponic:
