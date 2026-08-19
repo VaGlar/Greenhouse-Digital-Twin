@@ -107,12 +107,20 @@ class CropParams:
     variety: str
     planting_date: date
     density_plants_per_m2: float
-    reference_density_plants_per_m2: float = 2.5  # density lai_max was calibrated at
+    # Density lai_max was calibrated at. SOURCED — default matches standard
+    # commercial single-stem high-wire greenhouse tomato practice (2.3-2.5
+    # plants/m2; Peet & Welles, Greenhouse Tomato Production; VT Extension
+    # SPES-474). Full audit: docs/assumptions/crop-model.md
+    reference_density_plants_per_m2: float = 2.5
     lai_max: float = 3.5
     lai_ramp_days: float = 60.0  # days after planting to reach ~lai_max
     fruiting_start_days: float = 35.0  # days after planting before fruit partitioning begins
     fruiting_ramp_days: float = 20.0  # days to ramp from 0 to full fruit partition fraction
-    fruit_partition_fraction_max: float = 0.6
+    # SOURCED: raised from an earlier 0.6 placeholder to match TOMGRO literature
+    # (Bertin & Gary, 1993 calibration/validation for indeterminate greenhouse
+    # tomato), which reports 80-90% of dry-matter gain to fruit at peak fruiting.
+    # Full audit: docs/assumptions/crop-model.md
+    fruit_partition_fraction_max: float = 0.85
     dry_matter_content_fruit: float = 0.055  # fraction dry matter of fresh tomato fruit
 
     def __post_init__(self) -> None:
