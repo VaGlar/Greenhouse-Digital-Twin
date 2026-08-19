@@ -107,6 +107,7 @@ class CropParams:
     variety: str
     planting_date: date
     density_plants_per_m2: float
+    reference_density_plants_per_m2: float = 2.5  # density lai_max was calibrated at
     lai_max: float = 3.5
     lai_ramp_days: float = 60.0  # days after planting to reach ~lai_max
     fruiting_start_days: float = 35.0  # days after planting before fruit partitioning begins
@@ -117,6 +118,8 @@ class CropParams:
     def __post_init__(self) -> None:
         if self.density_plants_per_m2 <= 0:
             raise ValueError("density_plants_per_m2 must be > 0")
+        if self.reference_density_plants_per_m2 <= 0:
+            raise ValueError("reference_density_plants_per_m2 must be > 0")
         if self.lai_max <= 0:
             raise ValueError("lai_max must be > 0")
         if not 0 < self.dry_matter_content_fruit < 1:

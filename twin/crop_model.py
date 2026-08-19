@@ -65,12 +65,22 @@ def _co2_response(co2_ppm: float) -> float:
 
 
 def _lai(params: CropParams, days_after_planting: float) -> float:
-    """Logistic growth from ~0 to lai_max over lai_ramp_days."""
+    """Logistic growth from ~0 to an effective lai_max over lai_ramp_days.
+
+    lai_max is literature-typical for a canopy planted at
+    reference_density_plants_per_m2; a sparser planting closes its canopy
+    at a proportionally lower peak LAI (fewer plants per m2 -> less total
+    leaf area, up to the point of full canopy closure), a denser one is
+    capped at lai_max (extra plants beyond canopy closure add negligible
+    net leaf area in this simplified model).
+    """
+    density_factor = min(1.0, params.density_plants_per_m2 / params.reference_density_plants_per_m2)
+    effective_lai_max = params.lai_max * density_factor
     if days_after_planting <= 0:
         return 0.05
     x = days_after_planting / params.lai_ramp_days
     logistic = 1.0 / (1.0 + math.exp(-10 * (x - 0.5)))
-    return max(0.05, params.lai_max * logistic)
+    return max(0.05, effective_lai_max * logistic)
 
 
 def _fruit_partition_fraction(params: CropParams, days_after_planting: float) -> float:
