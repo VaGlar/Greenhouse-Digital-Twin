@@ -107,7 +107,10 @@ class CropParams:
     variety: str
     planting_date: date
     density_plants_per_m2: float
-    reference_density_plants_per_m2: float = 2.5  # density lai_max was calibrated at
+    # Density lai_max was calibrated at. Default matches standard commercial
+    # single-stem high-wire greenhouse tomato practice (2.3-2.5 plants/m2;
+    # Peet & Welles, Greenhouse Tomato Production; VT Extension SPES-474).
+    reference_density_plants_per_m2: float = 2.5
     lai_max: float = 3.5
     lai_ramp_days: float = 60.0  # days after planting to reach ~lai_max
     fruiting_start_days: float = 35.0  # days after planting before fruit partitioning begins

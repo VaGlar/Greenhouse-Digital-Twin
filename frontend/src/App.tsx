@@ -54,7 +54,10 @@ const SLIDER_GROUPS: SliderGroup[] = [
         min: 2,
         max: 5,
         step: 0.25,
-        optimal: [3, 4],
+        // Commercial single-stem high-wire greenhouse tomato: 2.3-2.5 plants/m2
+        // is standard practice, pushed toward ~3 with a second stem per plant
+        // (Peet & Welles, Greenhouse Tomato Production; VT Extension SPES-474).
+        optimal: [2.3, 3.0],
       },
     ],
   },
