@@ -1,0 +1,19 @@
+# Climate control assumptions
+
+`config/greenhouse_example.yaml` → `climate_control:` block. Model code: `twin/climate_model.py`.
+
+| Parameter | Value | Tag | Notes |
+|---|---|---|---|
+| `heating_setpoint_day_c` | 20.0 | **SOURCED** | Within the commonly cited optimal daytime range for greenhouse tomato, ~21–27°C is often quoted as ideal but 20°C is a standard, slightly conservative operational setpoint used in practice (heating cost vs. growth trade-off). Source: general greenhouse tomato temperature guidance, e.g. [Review of optimum temperature/VPD for greenhouse tomato](https://www.researchgate.net/publication/323225604_Review_of_optimum_temperature_humidity_and_vapour_pressure_deficit_for_microclimate_evaluation_and_control_in_greenhouse_cultivation_of_tomato_a_review) (review article, no single page — synthesizes many studies). |
+| `heating_setpoint_night_c` | 17.0 | **SOURCED** | Matches commonly cited optimal nighttime range of 17–18°C for greenhouse tomato. Same source as above. |
+| `day_start_hour` / `day_end_hour` | 6 / 20 | **PLACEHOLDER** | A generic 14-hour "day" window, not tied to actual sunrise/sunset for the greenhouse's real latitude/season — the weather model already computes solar radiation seasonally, but this day/night climate-control window is currently a flat clock-time boundary, not linked to actual daylight. Worth revisiting: could be derived from latitude + day-of-year instead of hardcoded hours. |
+| `vent_temp_margin_c` | 2.0 | **PLACEHOLDER** | A standard control-engineering choice (ventilation kicks in a couple degrees above the heating setpoint to avoid heating/venting oscillating against each other) — reasonable practice, not from a specific greenhouse-tomato source. |
+| `vent_max_ach` | 15.0 | **PLACEHOLDER** | Air changes per hour under full ventilation — order-of-magnitude plausible for a naturally/mechanically vented greenhouse, not benchmarked against this greenhouse's actual vent design (roof vent area, fan capacity). |
+| `vent_min_ach` | 0.5 | **PLACEHOLDER** | Baseline leakage rate — generic assumption, not measured. |
+| `co2_setpoint_day_ppm` | 900.0 | **SOURCED** | Falls within the commonly cited optimal CO2 enrichment range (700–1000 ppm) for greenhouse tomato photosynthesis. Same review source as temperature setpoints above. |
+| `co2_ambient_ppm` | 420.0 | **SOURCED — factual, not a modeling choice** | Current global atmospheric CO2 concentration is ~420-425 ppm as of the mid-2020s (NOAA Global Monitoring Laboratory / Mauna Loa Observatory record). This is a real, current value, not an assumption to recalibrate. |
+| `effective_heat_capacity_j_m2k` | 40000.0 | **PLACEHOLDER** | Lumped thermal mass per m² floor area representing the air + immediate structure/crop thermal buffering — an engineering simplification (the real greenhouse has separate air, soil/substrate, and structural thermal masses that this single-zone model collapses into one number). Not sourced to a specific reference; a reasonable order-of-magnitude guess for a hydroponic (low soil mass) system, should be checked against actual measured temperature response once the greenhouse exists. |
+
+## Modeling structure note (not a numeric assumption)
+
+The climate model's core architecture — CHP heat/CO2 as a *fixed supply the greenhouse draws from, with surplus dumped/vented rather than the CHP throttling to match demand* — is a confirmed real design decision from the user (the CHP runs at constant electrical output, grid-driven), not a literature assumption. See `twin/climate_model.py` module docstring.

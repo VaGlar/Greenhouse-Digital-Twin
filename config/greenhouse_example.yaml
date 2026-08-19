@@ -5,50 +5,56 @@
 name: "Παράδειγμα θερμοκηπίου τομάτας 5 στρεμμάτων"
 
 geometry:
-  area_m2: 5000
-  height_m: 5.5
-  cover_u_value_w_m2k: 6.0       # single-layer glass, typical order of magnitude
-  cover_transmissivity: 0.7      # fraction of solar radiation transmitted indoors
-  cover_area_factor: 1.3         # roof+walls area as a multiple of floor area
+  area_m2: 5000                  # site-specific design figure ("5 στρέμματα") — confirm vs. final survey
+  height_m: 5.5                  # PLACEHOLDER, not individually sourced — see docs/assumptions/geometry-and-chp.md
+  cover_u_value_w_m2k: 6.0       # SOURCED: greenhouse single-glass U-value ~6.5 W/m2K (Greenhouse Management,
+                                  # "Determining greenhouse heat loss", greenhousemag.com — web article, no page)
+  cover_transmissivity: 0.7      # PLACEHOLDER, textbook range 70-90%, conservative end — not individually sourced
+  cover_area_factor: 1.3         # PLACEHOLDER, geometric estimate — depends on real structure, not literature
 
 chp:
-  electric_power_kw: 1000        # FIXED electrical output (grid-driven, not greenhouse-driven)
-  heat_to_power_ratio: 1.15      # recoverable thermal kW per electrical kW (typical gas CHP)
-  co2_kg_per_kwh_elec: 0.18      # flue-gas CO2 recovered per kWh of electrical output
+  electric_power_kw: 1000        # FIXED electrical output (grid-driven, not greenhouse-driven) — site-specific 1MW spec
+  heat_to_power_ratio: 1.15      # PLACEHOLDER, plausible but unverified: general CHP lit. quotes ~0.8-1.0,
+                                  # some engine units to ~1.1-1.2 with full heat recovery — replace with OEM datasheet
+  co2_kg_per_kwh_elec: 0.18      # PLACEHOLDER, derived not sourced — see docs/assumptions/geometry-and-chp.md
 
 climate_control:
-  heating_setpoint_day_c: 20.0
-  heating_setpoint_night_c: 17.0
-  day_start_hour: 6
-  day_end_hour: 20
-  vent_temp_margin_c: 2.0
-  vent_max_ach: 15.0
-  vent_min_ach: 0.5
-  co2_setpoint_day_ppm: 900.0
-  co2_ambient_ppm: 420.0
-  effective_heat_capacity_j_m2k: 40000.0
+  heating_setpoint_day_c: 20.0    # SOURCED: within cited optimal daytime range 21-27C, conservative end
+                                   # (review of optimum temp/VPD for greenhouse tomato, researchgate 323225604)
+  heating_setpoint_night_c: 17.0  # SOURCED: matches cited optimal nighttime range 17-18C, same source
+  day_start_hour: 6                # PLACEHOLDER: flat clock-time window, not derived from real sunrise/sunset
+  day_end_hour: 20                 # PLACEHOLDER: see docs/assumptions/climate-control.md
+  vent_temp_margin_c: 2.0          # PLACEHOLDER: control-engineering choice, not tomato-specific source
+  vent_max_ach: 15.0               # PLACEHOLDER: plausible order of magnitude, not benchmarked to real vent design
+  vent_min_ach: 0.5                # PLACEHOLDER: generic baseline leakage assumption
+  co2_setpoint_day_ppm: 900.0      # SOURCED: within cited optimal CO2 enrichment range 700-1000ppm, same review source
+  co2_ambient_ppm: 420.0           # SOURCED, factual: current global atmospheric CO2 (~420-425ppm, NOAA/Mauna Loa)
+  effective_heat_capacity_j_m2k: 40000.0  # PLACEHOLDER: lumped single-zone thermal mass estimate, not measured
 
 crop:
-  variety: "Beefsteak tomato"
-  planting_date: 2026-09-15
-  density_plants_per_m2: 2.5
-  lai_max: 3.5
-  lai_ramp_days: 60
-  fruiting_start_days: 35
-  fruiting_ramp_days: 20
-  fruit_partition_fraction_max: 0.6
-  dry_matter_content_fruit: 0.055
+  variety: "Beefsteak tomato"      # site-specific placeholder
+  planting_date: 2026-09-15        # site-specific placeholder
+  density_plants_per_m2: 2.5       # SOURCED: standard commercial single-stem high-wire density 2.3-2.5 plants/m2
+                                    # (VT Extension SPES-474; Peet & Welles, "Greenhouse Tomato Production")
+  lai_max: 3.5                     # PLACEHOLDER: plausible order of magnitude (typically cited 3-4), not individually sourced
+  lai_ramp_days: 60                # PLACEHOLDER: engineering guess, not sourced
+  fruiting_start_days: 35          # PLACEHOLDER: plausible order of magnitude, not individually sourced
+  fruiting_ramp_days: 20           # PLACEHOLDER: not sourced
+  fruit_partition_fraction_max: 0.6  # PLACEHOLDER, likely conservative: TOMGRO lit. (Bertin & Gary 1993) reports
+                                    # 80-90% of dry-matter gain to fruit at peak fruiting — candidate to raise, unchanged for now
+  dry_matter_content_fruit: 0.055  # SOURCED: ripe tomato fruit dry matter ~5.5% (USDA composition data, 94.5% water)
 
 hydroponic:
   system_type: "NFT"   # flag only in v1 — not modeled in depth yet
 
 weather:
-  source: "synthetic"  # switch to "csv" + csv_path once real local weather data is available
-  latitude_deg: 37.9
-  mean_annual_temp_c: 18.0
-  seasonal_amplitude_c: 9.0
-  diurnal_amplitude_c: 6.0
-  peak_solar_w_m2: 850.0
+  source: "synthetic"  # PLACEHOLDER by design — switch to "csv" + csv_path once real local weather data is available;
+                        # see docs/assumptions/weather.md — this is the highest-value real-data upgrade available
+  latitude_deg: 37.9           # site-specific (Athens) — NOTE: currently unused by the synthetic generator's math
+  mean_annual_temp_c: 18.0     # SITE-SPECIFIC, plausible: roughly matches Athens/Attica annual mean (~17-19C)
+  seasonal_amplitude_c: 9.0    # PLACEHOLDER: plausible Mediterranean order of magnitude, not verified vs. real station data
+  diurnal_amplitude_c: 6.0     # PLACEHOLDER: same, not verified
+  peak_solar_w_m2: 850.0       # PLACEHOLDER, plausible: Mediterranean summer noon peak commonly cited 800-1000 W/m2
 
 simulation:
   start_date: 2026-09-15

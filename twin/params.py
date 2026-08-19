@@ -107,9 +107,10 @@ class CropParams:
     variety: str
     planting_date: date
     density_plants_per_m2: float
-    # Density lai_max was calibrated at. Default matches standard commercial
-    # single-stem high-wire greenhouse tomato practice (2.3-2.5 plants/m2;
-    # Peet & Welles, Greenhouse Tomato Production; VT Extension SPES-474).
+    # Density lai_max was calibrated at. SOURCED — default matches standard
+    # commercial single-stem high-wire greenhouse tomato practice (2.3-2.5
+    # plants/m2; Peet & Welles, Greenhouse Tomato Production; VT Extension
+    # SPES-474). Full audit: docs/assumptions/crop-model.md
     reference_density_plants_per_m2: float = 2.5
     lai_max: float = 3.5
     lai_ramp_days: float = 60.0  # days after planting to reach ~lai_max

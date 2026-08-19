@@ -24,11 +24,16 @@ CH2O_MOLAR_MASS_G_MOL = 30.0
 CO2_TO_DRY_MATTER_FACTOR = CH2O_MOLAR_MASS_G_MOL / CO2_MOLAR_MASS_G_MOL  # g DM per g CO2 fixed
 
 # Canopy photosynthesis parameters (typical greenhouse tomato, illustrative).
-P_MAX_UMOL_M2_LEAF_S = 20.0  # light-saturated, CO2/temp-optimal assimilation rate per m2 leaf
-LIGHT_HALF_SAT_W_M2 = 200.0  # PAR (approximated via solar radiation) at half P_max
-CO2_HALF_SAT_PPM = 200.0  # relative to ambient (420 ppm) response saturating around 1000-1200 ppm
-T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 24.0, 35.0  # cardinal temperatures for photosynthesis
-MAINTENANCE_RESPIRATION_FRACTION_PER_DAY = 0.015  # fraction of standing dry matter respired per day at T_opt
+# See docs/assumptions/crop-model.md for the full source audit of every value below.
+P_MAX_UMOL_M2_LEAF_S = 20.0  # SOURCED, conservative end of the 20-40 umol/m2/s range reported for tomato
+# (Growth and Photosynthetic Response of Tomato to Nutrient Solution Concentration, researchgate 258515123 —
+#  journal article, specific page not confirmed, figure taken from search-result summary)
+LIGHT_HALF_SAT_W_M2 = 200.0  # PLACEHOLDER, plausible order of magnitude — not individually sourced
+CO2_HALF_SAT_PPM = 200.0  # PLACEHOLDER, plausible shape (saturates ~1000-1200ppm) — not individually sourced
+T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 24.0, 35.0  # SOURCED but T_MIN/T_OPT run low vs. newer lit.: photosynthesis-
+# specific studies report optimum 25-35C, tomato retains 50% rate even at 47C (Frontiers 10.3389/fpls.2017.00365;
+# researchgate 323225604 review) — T_OPT is a candidate to raise toward ~27-28C, left unchanged for now
+MAINTENANCE_RESPIRATION_FRACTION_PER_DAY = 0.015  # PLACEHOLDER, plausible order of magnitude — not individually sourced
 
 
 @dataclass
