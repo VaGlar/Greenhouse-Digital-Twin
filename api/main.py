@@ -24,6 +24,8 @@ app = FastAPI(title="Greenhouse Digital Twin API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    # Codespaces/Gitpod-style forwarded preview URLs (e.g. https://<name>-5173.app.github.dev)
+    allow_origin_regex=r"https://.*\.app\.github\.dev",
     allow_methods=["*"],
     allow_headers=["*"],
 )
