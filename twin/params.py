@@ -164,10 +164,7 @@ class GreenhouseParams:
     weather: WeatherParams = field(default_factory=WeatherParams)
 
     @staticmethod
-    def from_yaml(path: str | Path) -> "GreenhouseParams":
-        with open(path, "r", encoding="utf-8") as f:
-            raw = yaml.safe_load(f)
-
+    def from_dict(raw: dict) -> "GreenhouseParams":
         return GreenhouseParams(
             name=raw["name"],
             geometry=GeometryParams(**raw["geometry"]),
@@ -178,3 +175,9 @@ class GreenhouseParams:
             hydroponic=HydroponicParams(**raw.get("hydroponic", {})),
             weather=WeatherParams(**raw.get("weather", {})),
         )
+
+    @staticmethod
+    def from_yaml(path: str | Path) -> "GreenhouseParams":
+        with open(path, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+        return GreenhouseParams.from_dict(raw)

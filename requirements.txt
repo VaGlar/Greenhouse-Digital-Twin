@@ -3,3 +3,5 @@ numpy>=1.24
 PyYAML>=6.0
 matplotlib>=3.7
 pytest>=7.0
+fastapi>=0.110
+uvicorn[standard]>=0.29
