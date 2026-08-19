@@ -20,6 +20,12 @@ export interface GreenhouseConfig {
   chp: { electric_power_kw: number; heat_to_power_ratio: number; co2_kg_per_kwh_elec: number };
   crop: { variety: string; planting_date: string; density_plants_per_m2: number };
   simulation: { start_date: string; duration_days: number; timestep_hours: number };
+  climate_control: {
+    heating_setpoint_day_c: number;
+    heating_setpoint_night_c: number;
+    co2_setpoint_day_ppm: number;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -42,6 +48,16 @@ export interface SimulationResult {
   daily_series: DailyPoint[];
 }
 
+export interface SimulationOverrides {
+  start_date?: string;
+  duration_days?: number;
+  crop_variety?: string;
+  crop_density_plants_per_m2?: number;
+  heating_setpoint_day_c?: number;
+  heating_setpoint_night_c?: number;
+  co2_setpoint_day_ppm?: number;
+}
+
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, init);
   if (!res.ok) {
@@ -54,6 +70,10 @@ export function getConfig(): Promise<GreenhouseConfig> {
   return getJson<GreenhouseConfig>("/config");
 }
 
-export function runSimulation(): Promise<SimulationResult> {
-  return getJson<SimulationResult>("/simulate", { method: "POST" });
+export function runSimulation(overrides: SimulationOverrides = {}): Promise<SimulationResult> {
+  return getJson<SimulationResult>("/simulate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(overrides),
+  });
 }
