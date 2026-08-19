@@ -1,0 +1,93 @@
+"""External weather input.
+
+v1 supports two sources:
+  - "csv": historical hourly weather from a local CSV file
+            (columns: timestamp, temp_out_c, solar_rad_w_m2, rh_out_pct)
+  - "synthetic": a seasonal + diurnal sinusoidal generator, used when no
+            real historical data is available yet for the target site.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+
+import pandas as pd
+
+from twin.params import WeatherParams
+
+
+@dataclass
+class WeatherPoint:
+    timestamp: datetime
+    temp_out_c: float
+    solar_rad_w_m2: float
+    rh_out_pct: float
+
+
+def load_weather(params: WeatherParams, start_date: date, duration_days: int, timestep_hours: float) -> pd.DataFrame:
+    if params.source == "csv":
+        return _load_csv(params, start_date, duration_days)
+    if params.source == "synthetic":
+        return _generate_synthetic(params, start_date, duration_days, timestep_hours)
+    raise ValueError(f"Unknown weather source: {params.source!r}")
+
+
+def _load_csv(params: WeatherParams, start_date: date, duration_days: int) -> pd.DataFrame:
+    if not params.csv_path:
+        raise ValueError("weather.csv_path is required when weather.source == 'csv'")
+    df = pd.read_csv(params.csv_path, parse_dates=["timestamp"])
+    required = {"timestamp", "temp_out_c", "solar_rad_w_m2", "rh_out_pct"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"weather CSV is missing required columns: {sorted(missing)}")
+
+    end_date = start_date + timedelta(days=duration_days)
+    mask = (df["timestamp"].dt.date >= start_date) & (df["timestamp"].dt.date < end_date)
+    df = df.loc[mask].sort_values("timestamp").reset_index(drop=True)
+    if df.empty:
+        raise ValueError(
+            f"weather CSV {params.csv_path!r} has no rows covering "
+            f"{start_date} .. {end_date}"
+        )
+    return df
+
+
+def _generate_synthetic(
+    params: WeatherParams, start_date: date, duration_days: int, timestep_hours: float
+) -> pd.DataFrame:
+    n_steps = int(duration_days * 24 / timestep_hours)
+    start_dt = datetime.combine(start_date, datetime.min.time())
+
+    rows = []
+    for i in range(n_steps):
+        ts = start_dt + timedelta(hours=i * timestep_hours)
+        day_of_year = ts.timetuple().tm_yday
+        hour = ts.hour + ts.minute / 60.0
+
+        # Seasonal cycle: peaks around day 172 (Jun 21, NH summer solstice).
+        seasonal = math.cos(2 * math.pi * (day_of_year - 172) / 365.25)
+        # Diurnal cycle: peaks in early afternoon (~14:00), trough before dawn.
+        diurnal = math.cos(2 * math.pi * (hour - 14) / 24)
+
+        temp_out_c = params.mean_annual_temp_c + params.seasonal_amplitude_c * seasonal + params.diurnal_amplitude_c * diurnal
+
+        # Solar radiation: zero at night, bell-shaped during daylight, scaled
+        # by the seasonal factor (less winter sun) and clipped at zero.
+        daylight = max(0.0, math.cos(2 * math.pi * (hour - 12) / 24))
+        seasonal_solar_factor = max(0.15, 0.5 + 0.5 * seasonal)
+        solar_rad_w_m2 = params.peak_solar_w_m2 * seasonal_solar_factor * daylight
+
+        rh_out_pct = 65.0 - 10.0 * daylight  # slightly drier at midday, simplistic
+
+        rows.append(
+            WeatherPoint(
+                timestamp=ts,
+                temp_out_c=temp_out_c,
+                solar_rad_w_m2=solar_rad_w_m2,
+                rh_out_pct=rh_out_pct,
+            )
+        )
+
+    return pd.DataFrame([r.__dict__ for r in rows])

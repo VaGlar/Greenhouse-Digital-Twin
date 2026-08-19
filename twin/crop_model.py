@@ -1,0 +1,144 @@
+"""Tomato crop growth model (TOMGRO-lite).
+
+Canopy-level photosynthesis driven by light, CO2 and temperature, coupled
+each hour to the climate model's greenhouse air state. Gross assimilation
+minus maintenance respiration accumulates as dry matter; a growth-stage
+dependent partitioning fraction sends part of that dry matter to fruit,
+which is converted to fresh-weight yield.
+
+This is a simplified, illustrative model (not a calibrated TOMGRO port).
+Cardinal temperatures, light/CO2 half-saturation constants and partition
+fractions are literature-typical defaults for greenhouse tomato and should
+be recalibrated once real yield/sensor data is available.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+
+from twin.params import CropParams
+
+CO2_MOLAR_MASS_G_MOL = 44.0
+CH2O_MOLAR_MASS_G_MOL = 30.0
+CO2_TO_DRY_MATTER_FACTOR = CH2O_MOLAR_MASS_G_MOL / CO2_MOLAR_MASS_G_MOL  # g DM per g CO2 fixed
+
+# Canopy photosynthesis parameters (typical greenhouse tomato, illustrative).
+P_MAX_UMOL_M2_LEAF_S = 20.0  # light-saturated, CO2/temp-optimal assimilation rate per m2 leaf
+LIGHT_HALF_SAT_W_M2 = 200.0  # PAR (approximated via solar radiation) at half P_max
+CO2_HALF_SAT_PPM = 200.0  # relative to ambient (420 ppm) response saturating around 1000-1200 ppm
+T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 24.0, 35.0  # cardinal temperatures for photosynthesis
+MAINTENANCE_RESPIRATION_FRACTION_PER_DAY = 0.015  # fraction of standing dry matter respired per day at T_opt
+
+
+@dataclass
+class CropState:
+    days_after_planting: float = 0.0
+    leaf_area_index: float = 0.05
+    standing_dry_matter_g_m2: float = 5.0  # total plant dry matter per m2 ground area
+    fruit_dry_matter_g_m2: float = 0.0
+    fruit_fresh_yield_kg_m2: float = 0.0
+
+
+@dataclass
+class CropStepResult:
+    state: CropState
+    gross_assimilation_kg_co2_m2_hour: float
+
+
+def _temperature_response(temp_c: float) -> float:
+    """Bell-shaped response, 0 outside [T_MIN, T_MAX], 1 at T_OPT."""
+    if temp_c <= T_MIN_C or temp_c >= T_MAX_C:
+        return 0.0
+    # Normalized product function (Yin et al. style), smooth and bounded in [0, 1].
+    num = (temp_c - T_MIN_C) * (T_MAX_C - temp_c)
+    den = (T_OPT_C - T_MIN_C) * (T_MAX_C - T_OPT_C)
+    return max(0.0, (num / den))
+
+
+def _light_response(solar_rad_w_m2: float) -> float:
+    return solar_rad_w_m2 / (solar_rad_w_m2 + LIGHT_HALF_SAT_W_M2) if solar_rad_w_m2 > 0 else 0.0
+
+
+def _co2_response(co2_ppm: float) -> float:
+    return co2_ppm / (co2_ppm + CO2_HALF_SAT_PPM)
+
+
+def _lai(params: CropParams, days_after_planting: float) -> float:
+    """Logistic growth from ~0 to lai_max over lai_ramp_days."""
+    if days_after_planting <= 0:
+        return 0.05
+    x = days_after_planting / params.lai_ramp_days
+    logistic = 1.0 / (1.0 + math.exp(-10 * (x - 0.5)))
+    return max(0.05, params.lai_max * logistic)
+
+
+def _fruit_partition_fraction(params: CropParams, days_after_planting: float) -> float:
+    if days_after_planting < params.fruiting_start_days:
+        return 0.0
+    ramp = (days_after_planting - params.fruiting_start_days) / params.fruiting_ramp_days
+    return params.fruit_partition_fraction_max * min(1.0, max(0.0, ramp))
+
+
+class TomatoCropModel:
+    def __init__(self, params: CropParams, ground_area_m2: float):
+        self.params = params
+        self.ground_area_m2 = ground_area_m2
+
+    def step(
+        self,
+        state: CropState,
+        temp_in_c: float,
+        co2_in_ppm: float,
+        solar_rad_w_m2: float,
+        dt_hours: float,
+    ) -> CropStepResult:
+        lai = _lai(self.params, state.days_after_planting)
+
+        f_light = _light_response(solar_rad_w_m2)
+        f_co2 = _co2_response(co2_in_ppm)
+        f_temp = _temperature_response(temp_in_c)
+
+        p_gross_umol_m2_leaf_s = P_MAX_UMOL_M2_LEAF_S * f_light * f_co2 * f_temp
+        p_gross_umol_m2_ground_s = p_gross_umol_m2_leaf_s * lai
+
+        # mol CO2 / m2 ground / hour -> kg CO2 / m2 ground / hour
+        gross_assimilation_kg_co2_m2_hour = (
+            p_gross_umol_m2_ground_s * 3600 * 1e-6 * CO2_MOLAR_MASS_G_MOL / 1000.0
+        )
+
+        gross_dry_matter_g_m2_hour = (
+            gross_assimilation_kg_co2_m2_hour * 1000.0 * CO2_TO_DRY_MATTER_FACTOR
+        )
+
+        # Maintenance respiration: proportional to standing biomass, scaled by
+        # the same temperature response (warmer -> faster respiration), spread
+        # evenly across the day rather than only during daylight.
+        respiration_g_m2_hour = (
+            state.standing_dry_matter_g_m2
+            * MAINTENANCE_RESPIRATION_FRACTION_PER_DAY
+            / 24.0
+            * max(f_temp, 0.3)
+        )
+
+        net_dry_matter_g_m2_hour = gross_dry_matter_g_m2_hour * dt_hours - respiration_g_m2_hour * dt_hours
+        # Standing biomass cannot shrink below its current value in this MVP
+        # (no senescence/abscission modeled yet).
+        new_standing_dm = max(state.standing_dry_matter_g_m2, state.standing_dry_matter_g_m2 + net_dry_matter_g_m2_hour)
+
+        fruit_fraction = _fruit_partition_fraction(self.params, state.days_after_planting)
+        new_growth_g_m2 = max(0.0, net_dry_matter_g_m2_hour)
+        fruit_dm_increment = new_growth_g_m2 * fruit_fraction
+
+        new_fruit_dm = state.fruit_dry_matter_g_m2 + fruit_dm_increment
+        new_fruit_fresh_yield_kg_m2 = new_fruit_dm / self.params.dry_matter_content_fruit / 1000.0
+
+        new_state = CropState(
+            days_after_planting=state.days_after_planting + dt_hours / 24.0,
+            leaf_area_index=lai,
+            standing_dry_matter_g_m2=new_standing_dm,
+            fruit_dry_matter_g_m2=new_fruit_dm,
+            fruit_fresh_yield_kg_m2=new_fruit_fresh_yield_kg_m2,
+        )
+
+        return CropStepResult(state=new_state, gross_assimilation_kg_co2_m2_hour=gross_assimilation_kg_co2_m2_hour)

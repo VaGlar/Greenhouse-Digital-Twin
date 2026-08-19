@@ -1,0 +1,56 @@
+# Example greenhouse configuration — illustrative placeholder values.
+# Replace with the real parameters of the 5-stremma tomato greenhouse once
+# they are finalized; nothing else in the codebase needs to change.
+
+name: "Παράδειγμα θερμοκηπίου τομάτας 5 στρεμμάτων"
+
+geometry:
+  area_m2: 5000
+  height_m: 5.5
+  cover_u_value_w_m2k: 6.0       # single-layer glass, typical order of magnitude
+  cover_transmissivity: 0.7      # fraction of solar radiation transmitted indoors
+  cover_area_factor: 1.3         # roof+walls area as a multiple of floor area
+
+chp:
+  electric_power_kw: 1000        # FIXED electrical output (grid-driven, not greenhouse-driven)
+  heat_to_power_ratio: 1.15      # recoverable thermal kW per electrical kW (typical gas CHP)
+  co2_kg_per_kwh_elec: 0.18      # flue-gas CO2 recovered per kWh of electrical output
+
+climate_control:
+  heating_setpoint_day_c: 20.0
+  heating_setpoint_night_c: 17.0
+  day_start_hour: 6
+  day_end_hour: 20
+  vent_temp_margin_c: 2.0
+  vent_max_ach: 15.0
+  vent_min_ach: 0.5
+  co2_setpoint_day_ppm: 900.0
+  co2_ambient_ppm: 420.0
+  effective_heat_capacity_j_m2k: 40000.0
+
+crop:
+  variety: "Beefsteak tomato"
+  planting_date: 2026-09-15
+  density_plants_per_m2: 2.5
+  lai_max: 3.5
+  lai_ramp_days: 60
+  fruiting_start_days: 35
+  fruiting_ramp_days: 20
+  fruit_partition_fraction_max: 0.6
+  dry_matter_content_fruit: 0.055
+
+hydroponic:
+  system_type: "NFT"   # flag only in v1 — not modeled in depth yet
+
+weather:
+  source: "synthetic"  # switch to "csv" + csv_path once real local weather data is available
+  latitude_deg: 37.9
+  mean_annual_temp_c: 18.0
+  seasonal_amplitude_c: 9.0
+  diurnal_amplitude_c: 6.0
+  peak_solar_w_m2: 850.0
+
+simulation:
+  start_date: 2026-09-15
+  duration_days: 150
+  timestep_hours: 1.0
