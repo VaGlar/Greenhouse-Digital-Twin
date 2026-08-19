@@ -1,4 +1,18 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8123";
+function detectApiBase(): string {
+  if (import.meta.env.VITE_API_BASE) return import.meta.env.VITE_API_BASE;
+
+  // Auto-detect the backend on GitHub Codespaces / Gitpod-style forwarded
+  // preview URLs, e.g. https://<name>-5173.app.github.dev -> ...-8123.app.github.dev
+  const { hostname, protocol } = window.location;
+  const match = hostname.match(/^(.*)-5173(\.app\.github\.dev)$/);
+  if (match) {
+    return `${protocol}//${match[1]}-8123${match[2]}`;
+  }
+
+  return "http://127.0.0.1:8123";
+}
+
+const API_BASE = detectApiBase();
 
 export interface GreenhouseConfig {
   name: string;
