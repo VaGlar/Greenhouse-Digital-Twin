@@ -24,6 +24,8 @@ export interface GreenhouseConfig {
     heating_setpoint_day_c: number;
     heating_setpoint_night_c: number;
     co2_setpoint_day_ppm: number;
+    screen_energy_saving_fraction: number;
+    dehumidification_setpoint_pct: number;
     [key: string]: unknown;
   };
   [key: string]: unknown;
@@ -34,6 +36,8 @@ export interface DailyPoint {
   temp_in_c: number;
   temp_out_c: number;
   co2_in_ppm: number;
+  rh_in_pct: number;
+  vpd_kpa: number;
   fruit_fresh_yield_kg_m2: number;
 }
 
@@ -56,6 +60,8 @@ export interface SimulationOverrides {
   heating_setpoint_day_c?: number;
   heating_setpoint_night_c?: number;
   co2_setpoint_day_ppm?: number;
+  screen_energy_saving_fraction?: number;
+  dehumidification_setpoint_pct?: number;
 }
 
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {

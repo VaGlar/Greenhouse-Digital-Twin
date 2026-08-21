@@ -62,6 +62,8 @@ class SimulateRequest(BaseModel):
     heating_setpoint_day_c: float | None = None
     heating_setpoint_night_c: float | None = None
     co2_setpoint_day_ppm: float | None = None
+    screen_energy_saving_fraction: float | None = None
+    dehumidification_setpoint_pct: float | None = None
 
 
 def _apply_overrides(raw: dict, overrides: SimulateRequest) -> dict:
@@ -81,6 +83,10 @@ def _apply_overrides(raw: dict, overrides: SimulateRequest) -> dict:
         climate["heating_setpoint_night_c"] = overrides.heating_setpoint_night_c
     if overrides.co2_setpoint_day_ppm is not None:
         climate["co2_setpoint_day_ppm"] = overrides.co2_setpoint_day_ppm
+    if overrides.screen_energy_saving_fraction is not None:
+        climate["screen_energy_saving_fraction"] = overrides.screen_energy_saving_fraction
+    if overrides.dehumidification_setpoint_pct is not None:
+        climate["dehumidification_setpoint_pct"] = overrides.dehumidification_setpoint_pct
     return raw
 
 
