@@ -36,6 +36,7 @@ interface SliderDef {
   max: number;
   step: number;
   optimal?: [number, number];
+  note?: string;
 }
 
 interface SliderGroup {
@@ -118,6 +119,7 @@ const SLIDER_GROUPS: SliderGroup[] = [
         // Literature range for greenhouse tomato RH is 60-85% (day 80-85%, night 65-75%);
         // 70% specifically cited as the pollination optimum — see docs/assumptions/climate-control.md
         optimal: [65, 75],
+        note: "Το εύρος 65-75% είναι το βέλτιστο για επικονίαση. Για μέγιστο yield (βέλτιστο VPD ~0.85 kPa), το μοντέλο ευνοεί πιο ξηρό αέρα (~56-68% RH ανάλογα με τη θερμοκρασία) — trade-off μεταξύ επικονίασης και φωτοσύνθεσης.",
       },
     ],
   },
@@ -226,6 +228,7 @@ function App() {
                   max={s.max}
                   step={s.step}
                   optimal={s.optimal}
+                  note={s.note}
                   value={sliderValues[s.key]}
                   onChange={(v) => setSliderValues((prev) => ({ ...prev, [s.key]: v }))}
                 />
