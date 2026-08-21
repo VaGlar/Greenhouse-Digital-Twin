@@ -26,5 +26,6 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`tomato-vpd-optimal-range.md`](./tomato-vpd-optimal-range.md) | `VPD_MIN_KPA`, `VPD_OPT_KPA`, `VPD_MAX_KPA` |
 | [`greenhouse-condensation-dewpoint-physics.md`](./greenhouse-condensation-dewpoint-physics.md) | condensation mechanism in `twin/climate_model.py` |
 | [`greenhouse-tomato-optimal-rh.md`](./greenhouse-tomato-optimal-rh.md) | `climate_control.dehumidification_setpoint_pct` |
+| [`tomato-co2-optimum-700ppm.md`](./tomato-co2-optimum-700ppm.md) | `CO2_SATURATION_PPM`, `climate_control.co2_setpoint_day_ppm` |
 
 See [`docs/assumptions/sources.xlsx`](../docs/assumptions/sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

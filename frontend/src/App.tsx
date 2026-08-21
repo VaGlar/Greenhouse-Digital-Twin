@@ -90,10 +90,14 @@ const SLIDER_GROUPS: SliderGroup[] = [
         key: "co2_setpoint_day_ppm",
         label: "CO₂ ημέρας",
         unit: " ppm",
-        min: 400,
-        max: 1200,
+        min: 0,
+        max: 1000,
         step: 25,
-        optimal: [700, 1000],
+        // Study testing 500/700/850/1000 ppm on tomato found 700ppm optimal, no
+        // yield benefit above it — see papers/tomato-co2-optimum-700ppm.md.
+        // Min=0 covers greenhouses that don't dose CO2 at all (ambient ~420ppm only).
+        optimal: [650, 750],
+        note: "0ppm = καθόλου ανθρακολίπανση (μόνο ambient CO2). Πάνω από ~700ppm το μοντέλο δεν δίνει επιπλέον yield.",
       },
     ],
   },

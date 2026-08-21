@@ -29,7 +29,10 @@ P_MAX_UMOL_M2_LEAF_S = 20.0  # SOURCED, conservative end of the 20-40 umol/m2/s 
 # (Growth and Photosynthetic Response of Tomato to Nutrient Solution Concentration, researchgate 258515123 —
 #  journal article, specific page not confirmed, figure taken from search-result summary)
 LIGHT_HALF_SAT_W_M2 = 200.0  # PLACEHOLDER, plausible order of magnitude — not individually sourced
-CO2_HALF_SAT_PPM = 200.0  # PLACEHOLDER, plausible shape (saturates ~1000-1200ppm) — not individually sourced
+CO2_HALF_SAT_PPM = 200.0  # PLACEHOLDER, plausible shape — not individually sourced
+CO2_SATURATION_PPM = 700.0  # SOURCED: tomato study testing 500/700/850/1000 ppm found 700ppm optimal,
+# no further yield benefit above it -- response plateaus here instead of rising indefinitely.
+# See docs/assumptions/crop-model.md and papers/tomato-co2-optimum-700ppm.md
 T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 27.0, 35.0  # SOURCED: T_OPT raised from 24C to 27C to match photosynthesis-
 # specific studies reporting optimum 25-35C (tomato retains 50% of photosynthetic rate even at 47C) — Frontiers
 # 10.3389/fpls.2017.00365; researchgate 323225604 review. T_MIN left unchanged (not part of this pass).
@@ -90,7 +93,17 @@ def _light_response(solar_rad_w_m2: float) -> float:
 
 
 def _co2_response(co2_ppm: float) -> float:
-    return co2_ppm / (co2_ppm + CO2_HALF_SAT_PPM)
+    """Michaelis-Menten rise up to CO2_SATURATION_PPM, then flat.
+
+    Fixed 2026-08-20: the raw Michaelis-Menten curve rises forever (never
+    caps), so yield kept climbing with CO2 setpoints far past what real
+    tomato can use. A specific study testing 500/700/850/1000 ppm found
+    700 ppm optimal and no further yield benefit above it (see
+    docs/assumptions/crop-model.md) -- clamped the input at
+    CO2_SATURATION_PPM so the response plateaus there instead of climbing
+    indefinitely.
+    """
+    return min(co2_ppm, CO2_SATURATION_PPM) / (min(co2_ppm, CO2_SATURATION_PPM) + CO2_HALF_SAT_PPM)
 
 
 def _vpd_response(vpd_kpa: float) -> float:
