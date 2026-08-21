@@ -29,7 +29,22 @@ P_MAX_UMOL_M2_LEAF_S = 20.0  # SOURCED, conservative end of the 20-40 umol/m2/s 
 # (Growth and Photosynthetic Response of Tomato to Nutrient Solution Concentration, researchgate 258515123 —
 #  journal article, specific page not confirmed, figure taken from search-result summary)
 LIGHT_HALF_SAT_W_M2 = 200.0  # PLACEHOLDER, plausible order of magnitude — not individually sourced
-CO2_HALF_SAT_PPM = 200.0  # PLACEHOLDER, plausible shape — not individually sourced
+CO2_HALF_SAT_PPM = 375.0  # SOURCED, raised from 200 on 2026-08-20: the biochemical Rubisco Km for CO2
+# (Ci-based, ~270-300 ppm at 25C in FvCB-model literature) needs adjusting for the Ci/Ca gradient
+# (Ci/Ca ~0.7-0.8 for well-watered C3 plants) to translate into a Ca-based (ambient/greenhouse air
+# CO2) constant like this one -- giving ~340-430 ppm; used the midpoint. On its own, this factor's
+# rectangular-hyperbola shape has elasticity <1 (% output gain always below % input gain), so it
+# alone can't reproduce the ~56-74% season-long yield gain a study reports from 500->700ppm CO2 --
+# see CO2_LAI_BOOST_MAX below for the channel that closes that gap. Confirmed against a sensitivity
+# sweep (K=100..600): 375 lands the model's ambient(420)->700ppm yield gain at ~56%, right at the
+# low end of that reported range. See docs/assumptions/crop-model.md.
+CO2_AMBIENT_REFERENCE_PPM = 420.0  # baseline CO2 the LAI boost below is measured relative to
+CO2_LAI_BOOST_MAX = 0.2688  # SOURCED: CO2 enrichment's real yield gain comes mostly from bigger leaf
+# area (LAI), not just faster instantaneous photosynthesis -- a study found LAI +26.88% at 700ppm
+# vs ambient (compounds over the season: more canopy -> more total assimilation every subsequent
+# hour). This is the season-long "compounding" channel the instantaneous CO2_HALF_SAT_PPM factor
+# above structurally cannot capture on its own. See docs/assumptions/crop-model.md and
+# papers/co2-lai-growth-boost.md.
 CO2_SATURATION_PPM = 700.0  # SOURCED: tomato study testing 500/700/850/1000 ppm found 700ppm optimal,
 # no further yield benefit above it -- response plateaus here instead of rising indefinitely.
 # See docs/assumptions/crop-model.md and papers/tomato-co2-optimum-700ppm.md
@@ -117,7 +132,7 @@ def _vpd_response(vpd_kpa: float) -> float:
     return min(1.0, max(0.0, num / den))
 
 
-def _lai(params: CropParams, days_after_planting: float) -> float:
+def _lai(params: CropParams, days_after_planting: float, co2_ppm: float) -> float:
     """Logistic growth from ~0 to an effective lai_max over lai_ramp_days.
 
     lai_max is literature-typical for a canopy planted at
@@ -126,9 +141,20 @@ def _lai(params: CropParams, days_after_planting: float) -> float:
     leaf area, up to the point of full canopy closure), a denser one is
     capped at lai_max (extra plants beyond canopy closure add negligible
     net leaf area in this simplified model).
+
+    CO2 also boosts effective_lai_max (added 2026-08-20): real tomato grows
+    more/bigger leaves under CO2 enrichment, not just faster instantaneous
+    photosynthesis -- this is the season-long compounding channel a single
+    per-hour multiplier can't represent. Scales linearly from no boost at
+    CO2_AMBIENT_REFERENCE_PPM to +CO2_LAI_BOOST_MAX at CO2_SATURATION_PPM,
+    reusing the same saturating shape as _co2_response for consistency.
     """
     density_factor = min(1.0, params.density_plants_per_m2 / params.reference_density_plants_per_m2)
-    effective_lai_max = params.lai_max * density_factor
+    co2_at_ambient = _co2_response(CO2_AMBIENT_REFERENCE_PPM)
+    co2_at_saturation = _co2_response(CO2_SATURATION_PPM)
+    co2_progress = (_co2_response(co2_ppm) - co2_at_ambient) / (co2_at_saturation - co2_at_ambient)
+    co2_lai_factor = 1.0 + CO2_LAI_BOOST_MAX * min(1.0, max(0.0, co2_progress))
+    effective_lai_max = params.lai_max * density_factor * co2_lai_factor
     if days_after_planting <= 0:
         return 0.05
     x = days_after_planting / params.lai_ramp_days
@@ -157,7 +183,7 @@ class TomatoCropModel:
         dt_hours: float,
         vpd_kpa: float = VPD_OPT_KPA,
     ) -> CropStepResult:
-        lai = _lai(self.params, state.days_after_planting)
+        lai = _lai(self.params, state.days_after_planting, co2_in_ppm)
 
         f_light = _light_response(solar_rad_w_m2)
         f_co2 = _co2_response(co2_in_ppm)
