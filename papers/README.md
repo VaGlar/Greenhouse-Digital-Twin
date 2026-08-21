@@ -18,5 +18,8 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`bertin-gary-1993-tomgro.md`](./bertin-gary-1993-tomgro.md) | `fruit_partition_fraction_max` |
 | [`noaa-mauna-loa-co2.md`](./noaa-mauna-loa-co2.md) | `co2_ambient_ppm` |
 | [`usda-fdc-tomato-170457.md`](./usda-fdc-tomato-170457.md) | `dry_matter_content_fruit` |
+| [`geothermiki-s192g-quote.md`](./geothermiki-s192g-quote.md) | `geometry.height_m`, `geometry.cover_area_factor` — real vendor quote for this greenhouse |
+| [`tunnelvisionhoops-double-layer.md`](./tunnelvisionhoops-double-layer.md) | `geometry.cover_u_value_w_m2k` |
+| [`greenhouse-film-180micron-transmission.md`](./greenhouse-film-180micron-transmission.md) | `geometry.cover_transmissivity` |
 
 See [`docs/assumptions/sources.xlsx`](../docs/assumptions/sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.
