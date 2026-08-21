@@ -15,6 +15,15 @@ itself is never modulated based on greenhouse demand.
 Thermal screen: deployed every night (retracted during the day), cutting
 transmission heat loss by a fixed fraction. Modeled as a simple day/night
 toggle, not a continuous deploy/retract control loop.
+
+Humidity: tracked as vapor pressure (kPa), the same way real greenhouse
+models do (rather than tracking relative humidity directly, which is
+nonlinear in temperature). Water enters the air from crop transpiration
+(computed in twin/crop_model.py) and leaves via ventilation exchange with
+outdoor air -- the same ventilation rate already computed for the energy
+balance. No condensation/dehumidification is modeled: vapor pressure is
+simply capped at saturation (100% RH), so excess moisture is implicitly
+"lost" rather than physically tracked as condensate on the cover.
 """
 
 from __future__ import annotations
@@ -26,12 +35,21 @@ from twin.params import CHPParams, ClimateControlParams, GeometryParams
 
 AIR_VOLUMETRIC_HEAT_CAPACITY_J_M3K = 1_200.0  # ~ air density (1.2 kg/m3) x specific heat (1005 J/kgK)
 CO2_DENSITY_KG_M3 = 1.83  # density of CO2 gas at ~20C, used only to convert mass <-> ppm
+WATER_MOLAR_MASS_G_MOL = 18.02  # physical constant
+GAS_CONSTANT_J_MOL_K = 8.314  # physical constant (ideal gas law)
+
+
+def _saturation_vapor_pressure_kpa(temp_c: float) -> float:
+    """Tetens/Magnus formula, kPa. Standard meteorological equation (e.g. FAO-56
+    Penman-Monteith reference, Allen et al. 1998, eq. 11) -- not a model assumption."""
+    return 0.6108 * math.exp(17.27 * temp_c / (temp_c + 237.3))
 
 
 @dataclass
 class ClimateState:
     temp_in_c: float
     co2_in_ppm: float
+    vapor_pressure_kpa: float = 1.0  # ~65% RH at 20C; overwritten by the first step anyway
 
 
 @dataclass
@@ -42,6 +60,8 @@ class ClimateStepResult:
     vent_ach: float
     co2_injected_kg: float
     co2_dumped_kg: float
+    rh_in_pct: float
+    vpd_kpa: float
 
 
 class GreenhouseClimateModel:
@@ -59,6 +79,8 @@ class GreenhouseClimateModel:
         solar_rad_w_m2: float,
         dt_hours: float,
         co2_uptake_kg_per_hour: float = 0.0,
+        rh_out_pct: float = 60.0,
+        transpiration_kg_per_hour: float = 0.0,
     ) -> ClimateStepResult:
         dt_s = dt_hours * 3600.0
         c_total = self._thermal_capacity_j_k
@@ -118,11 +140,29 @@ class GreenhouseClimateModel:
         delta_ppm_injection = injected_kg / CO2_DENSITY_KG_M3 / self.geometry.volume_m3 * 1e6
         co2_new = max(co2_before_dosing + delta_ppm_injection, 200.0)
 
+        # --- Humidity balance: ventilation exchange (same ach as above) plus
+        # crop transpiration, tracked as vapor pressure (kPa). ---
+        vapor_out_kpa = _saturation_vapor_pressure_kpa(temp_out_c) * rh_out_pct / 100.0
+        vapor_after_vent = vapor_out_kpa + (state.vapor_pressure_kpa - vapor_out_kpa) * math.exp(-ach * dt_hours)
+
+        transpiration_kg = transpiration_kg_per_hour * dt_hours
+        moles_water = transpiration_kg * 1000.0 / WATER_MOLAR_MASS_G_MOL
+        temp_in_kelvin = temp_new + 273.15
+        delta_vapor_kpa = moles_water * GAS_CONSTANT_J_MOL_K * temp_in_kelvin / self.geometry.volume_m3 / 1000.0
+
+        saturation_kpa = _saturation_vapor_pressure_kpa(temp_new)
+        vapor_new = min(vapor_after_vent + delta_vapor_kpa, saturation_kpa)  # cap at 100% RH, no condensation modeled
+
+        rh_in_pct = vapor_new / saturation_kpa * 100.0
+        vpd_kpa = saturation_kpa - vapor_new
+
         return ClimateStepResult(
-            state=ClimateState(temp_in_c=temp_new, co2_in_ppm=co2_new),
+            state=ClimateState(temp_in_c=temp_new, co2_in_ppm=co2_new, vapor_pressure_kpa=vapor_new),
             heat_used_kw=heat_used_kw,
             heat_dumped_kw=heat_dumped_kw,
             vent_ach=ach,
             co2_injected_kg=injected_kg,
             co2_dumped_kg=co2_dumped_kg,
+            rh_in_pct=rh_in_pct,
+            vpd_kpa=vpd_kpa,
         )

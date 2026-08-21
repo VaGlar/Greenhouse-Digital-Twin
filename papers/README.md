@@ -21,5 +21,7 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`geothermiki-s192g-quote.md`](./geothermiki-s192g-quote.md) | `geometry.height_m`, `geometry.cover_area_factor` — real vendor quote for this greenhouse |
 | [`tunnelvisionhoops-double-layer.md`](./tunnelvisionhoops-double-layer.md) | `geometry.cover_u_value_w_m2k` |
 | [`greenhouse-film-180micron-transmission.md`](./greenhouse-film-180micron-transmission.md) | `geometry.cover_transmissivity` |
+| [`tomato-canopy-extinction-coefficient.md`](./tomato-canopy-extinction-coefficient.md) | `CANOPY_LIGHT_EXTINCTION_COEFF` |
+| [`tomato-transpiration-latent-heat-fraction.md`](./tomato-transpiration-latent-heat-fraction.md) | `TRANSPIRATION_ENERGY_FRACTION` |
 
 See [`docs/assumptions/sources.xlsx`](../docs/assumptions/sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

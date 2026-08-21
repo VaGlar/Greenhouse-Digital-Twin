@@ -27,6 +27,8 @@ Distinct from the tables above — these are things the model doesn't attempt to
 - **Senescence / leaf abscission** (`twin/crop_model.py`) — real plants shed old leaves/tissue as they age (permanent biomass loss), on top of the day-to-day respiration the model does track (fixed 2026-08-20, see `crop-model.md`). Not modeled — would matter most for long crop cycles (many months) where accumulated leaf drop becomes significant. No target date; revisit if long-cycle runs start looking unrealistically leafy/heavy late in the cycle.
 - **Latitude-driven day length** (`twin/weather.py`) — `weather.latitude_deg` is stored but unused; the synthetic weather generator uses flat calendar-day/hour sinusoids instead of real sun-angle geometry. See `weather.md`.
 - **Fixed day/night clock window** (`climate_control.day_start_hour/day_end_hour`) — a flat 6am-8pm boundary, not tied to actual sunrise/sunset for the real site/season. See `climate-control.md`.
+- **Condensation/dehumidification** (`twin/climate_model.py`, added 2026-08-20) — the new humidity model caps vapor pressure at saturation (100% RH) instead of modeling condensation on the cover or active dehumidification (relevant to the real quote's OptiClima cooling/dehumidification panels). See `crop-model.md`.
+- **Humidity doesn't feed back into crop growth yet** — RH/VPD are tracked and reported, but the crop model's photosynthesis/stomatal response still ignores them (no VPD-driven stomatal closure). A real refinement for later, and a prerequisite for a future disease-risk module (Botrytis/powdery mildew both depend heavily on RH).
 
 ## Research method note
 

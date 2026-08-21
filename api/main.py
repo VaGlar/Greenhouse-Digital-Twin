@@ -100,6 +100,8 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "temp_in_c": "mean",
                 "temp_out_c": "mean",
                 "co2_in_ppm": "mean",
+                "rh_in_pct": "mean",
+                "vpd_kpa": "mean",
                 "fruit_fresh_yield_kg_m2": "last",
             }
         )
@@ -122,6 +124,8 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "temp_in_c": round(row.temp_in_c, 2),
                 "temp_out_c": round(row.temp_out_c, 2),
                 "co2_in_ppm": round(row.co2_in_ppm, 1),
+                "rh_in_pct": round(row.rh_in_pct, 1),
+                "vpd_kpa": round(row.vpd_kpa, 3),
                 "fruit_fresh_yield_kg_m2": round(row.fruit_fresh_yield_kg_m2, 3),
             }
             for row in daily.itertuples()

@@ -35,6 +35,14 @@ T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 27.0, 35.0  # SOURCED: T_OPT raised from 24C t
 # 10.3389/fpls.2017.00365; researchgate 323225604 review. T_MIN left unchanged (not part of this pass).
 MAINTENANCE_RESPIRATION_FRACTION_PER_DAY = 0.015  # PLACEHOLDER, plausible order of magnitude — not individually sourced
 
+# Canopy transpiration (drives the climate model's humidity balance).
+CANOPY_LIGHT_EXTINCTION_COEFF = 0.75  # SOURCED: Beer-Lambert k for high-wire tomato canopies, reported 0.7-0.9
+# (general canopy light-interception literature; see docs/assumptions/crop-model.md)
+TRANSPIRATION_ENERGY_FRACTION = 0.70  # SOURCED: latent heat flux is 66.4-71.7% of net radiation intercepted
+# by a greenhouse tomato canopy (measured study); see docs/assumptions/crop-model.md
+LATENT_HEAT_OF_VAPORIZATION_J_KG = 2.45e6  # physical constant, water at ~20C (standard meteorological value,
+# e.g. FAO-56 Penman-Monteith reference)
+
 
 @dataclass
 class CropState:
@@ -49,6 +57,7 @@ class CropState:
 class CropStepResult:
     state: CropState
     gross_assimilation_kg_co2_m2_hour: float
+    transpiration_kg_m2_hour: float
 
 
 def _temperature_response(temp_c: float) -> float:
@@ -161,4 +170,16 @@ class TomatoCropModel:
             fruit_fresh_yield_kg_m2=new_fruit_fresh_yield_kg_m2,
         )
 
-        return CropStepResult(state=new_state, gross_assimilation_kg_co2_m2_hour=gross_assimilation_kg_co2_m2_hour)
+        # Canopy transpiration: fraction of solar radiation intercepted by the canopy
+        # (Beer-Lambert, LAI-driven) that is converted to latent heat (water vapor),
+        # feeding the climate model's humidity balance. Zero at night (no solar input).
+        canopy_interception = 1.0 - math.exp(-CANOPY_LIGHT_EXTINCTION_COEFF * lai)
+        absorbed_solar_w_m2 = solar_rad_w_m2 * canopy_interception
+        latent_heat_w_m2 = absorbed_solar_w_m2 * TRANSPIRATION_ENERGY_FRACTION
+        transpiration_kg_m2_hour = latent_heat_w_m2 * 3600.0 / LATENT_HEAT_OF_VAPORIZATION_J_KG
+
+        return CropStepResult(
+            state=new_state,
+            gross_assimilation_kg_co2_m2_hour=gross_assimilation_kg_co2_m2_hour,
+            transpiration_kg_m2_hour=transpiration_kg_m2_hour,
+        )
