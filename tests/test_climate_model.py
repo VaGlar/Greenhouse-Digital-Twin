@@ -61,3 +61,44 @@ def test_heat_available_and_co2_available_scale_with_fixed_electric_output():
     chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
     assert chp.heat_available_kw == 1150.0
     assert chp.co2_available_kg_per_hour == 180.0
+
+
+def test_dry_ventilation_lowers_humidity_toward_outdoor():
+    geometry = _geometry()
+    control = _control()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    humid_state = ClimateState(temp_in_c=25.0, co2_in_ppm=420.0, vapor_pressure_kpa=2.5)
+    # hot enough to force strong ventilation, dry outdoor air
+    result = model.step(humid_state, hour=13, temp_out_c=25.0, solar_rad_w_m2=800.0, dt_hours=1.0, rh_out_pct=20.0)
+
+    assert result.state.vapor_pressure_kpa < humid_state.vapor_pressure_kpa
+
+
+def test_cold_cover_condenses_moisture_out_of_humid_air():
+    geometry = _geometry()
+    control = _control()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    # warm, humid interior air; very cold outside -> cold cover surface, forces condensation
+    # even though the ventilation rate is at its minimum (not itself removing much moisture)
+    humid_state = ClimateState(temp_in_c=20.0, co2_in_ppm=420.0, vapor_pressure_kpa=2.0)
+    result = model.step(humid_state, hour=2, temp_out_c=-10.0, solar_rad_w_m2=0.0, dt_hours=1.0, rh_out_pct=80.0)
+
+    assert result.condensed_kg > 0.0
+
+
+def test_active_dehumidification_caps_relative_humidity_at_setpoint():
+    geometry = _geometry()
+    control = _control()  # dehumidification_setpoint_pct defaults to 85.0
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    # push vapor pressure near saturation; humid, still outdoor air (little ventilation relief)
+    saturated_state = ClimateState(temp_in_c=20.0, co2_in_ppm=420.0, vapor_pressure_kpa=2.3)
+    result = model.step(saturated_state, hour=2, temp_out_c=18.0, solar_rad_w_m2=0.0, dt_hours=1.0, rh_out_pct=95.0)
+
+    assert result.rh_in_pct <= control.dehumidification_setpoint_pct + 0.01
+    assert result.dehumidified_kg > 0.0

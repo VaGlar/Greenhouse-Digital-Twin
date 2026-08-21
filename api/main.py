@@ -62,6 +62,8 @@ class SimulateRequest(BaseModel):
     heating_setpoint_day_c: float | None = None
     heating_setpoint_night_c: float | None = None
     co2_setpoint_day_ppm: float | None = None
+    screen_energy_saving_fraction: float | None = None
+    dehumidification_setpoint_pct: float | None = None
 
 
 def _apply_overrides(raw: dict, overrides: SimulateRequest) -> dict:
@@ -81,6 +83,10 @@ def _apply_overrides(raw: dict, overrides: SimulateRequest) -> dict:
         climate["heating_setpoint_night_c"] = overrides.heating_setpoint_night_c
     if overrides.co2_setpoint_day_ppm is not None:
         climate["co2_setpoint_day_ppm"] = overrides.co2_setpoint_day_ppm
+    if overrides.screen_energy_saving_fraction is not None:
+        climate["screen_energy_saving_fraction"] = overrides.screen_energy_saving_fraction
+    if overrides.dehumidification_setpoint_pct is not None:
+        climate["dehumidification_setpoint_pct"] = overrides.dehumidification_setpoint_pct
     return raw
 
 
@@ -100,6 +106,8 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "temp_in_c": "mean",
                 "temp_out_c": "mean",
                 "co2_in_ppm": "mean",
+                "rh_in_pct": "mean",
+                "vpd_kpa": "mean",
                 "fruit_fresh_yield_kg_m2": "last",
             }
         )
@@ -122,6 +130,8 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "temp_in_c": round(row.temp_in_c, 2),
                 "temp_out_c": round(row.temp_out_c, 2),
                 "co2_in_ppm": round(row.co2_in_ppm, 1),
+                "rh_in_pct": round(row.rh_in_pct, 1),
+                "vpd_kpa": round(row.vpd_kpa, 3),
                 "fruit_fresh_yield_kg_m2": round(row.fruit_fresh_yield_kg_m2, 3),
             }
             for row in daily.itertuples()

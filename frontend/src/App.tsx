@@ -24,6 +24,8 @@ type SliderKey =
   | "heating_setpoint_day_c"
   | "heating_setpoint_night_c"
   | "co2_setpoint_day_ppm"
+  | "screen_energy_saving_fraction_pct"
+  | "dehumidification_setpoint_pct"
   | "duration_days";
 
 interface SliderDef {
@@ -95,6 +97,31 @@ const SLIDER_GROUPS: SliderGroup[] = [
     ],
   },
   {
+    key: "humidity",
+    label: "💧 Υγρασία",
+    sliders: [
+      {
+        key: "screen_energy_saving_fraction_pct",
+        label: "Θερμοκουρτίνα (εξοικονόμηση, νύχτα)",
+        unit: "%",
+        min: 0,
+        max: 80,
+        step: 5,
+      },
+      {
+        key: "dehumidification_setpoint_pct",
+        label: "Στόχος αφύγρανσης (RH)",
+        unit: "%",
+        min: 50,
+        max: 90,
+        step: 1,
+        // Literature range for greenhouse tomato RH is 60-85% (day 80-85%, night 65-75%);
+        // 70% specifically cited as the pollination optimum — see docs/assumptions/climate-control.md
+        optimal: [65, 75],
+      },
+    ],
+  },
+  {
     key: "run",
     label: "📅 Προσομοίωση",
     sliders: [
@@ -108,6 +135,8 @@ const DEFAULT_SLIDER_VALUES: Record<SliderKey, number> = {
   heating_setpoint_day_c: 20,
   heating_setpoint_night_c: 17,
   co2_setpoint_day_ppm: 900,
+  screen_energy_saving_fraction_pct: 55,
+  dehumidification_setpoint_pct: 70,
   duration_days: 150,
 };
 
@@ -130,6 +159,8 @@ function App() {
           heating_setpoint_day_c: c.climate_control.heating_setpoint_day_c,
           heating_setpoint_night_c: c.climate_control.heating_setpoint_night_c,
           co2_setpoint_day_ppm: c.climate_control.co2_setpoint_day_ppm,
+          screen_energy_saving_fraction_pct: Math.round(c.climate_control.screen_energy_saving_fraction * 100),
+          dehumidification_setpoint_pct: c.climate_control.dehumidification_setpoint_pct,
           duration_days: c.simulation.duration_days,
         });
         setCropVariety(c.crop.variety);
@@ -142,8 +173,10 @@ function App() {
     setLoading(true);
     setError(null);
     try {
+      const { screen_energy_saving_fraction_pct, ...restSliderValues } = sliderValues;
       const overrides: SimulationOverrides = {
-        ...sliderValues,
+        ...restSliderValues,
+        screen_energy_saving_fraction: screen_energy_saving_fraction_pct / 100,
         crop_variety: cropVariety || undefined,
         start_date: startDate || undefined,
       };
@@ -262,6 +295,32 @@ function App() {
                 <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" ppm" width={56} />
                 <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
                 <Line type="monotone" dataKey="co2_in_ppm" name="CO2" stroke="var(--series-3)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </section>
+
+          <section className="chart-card">
+            <h2>Σχετική υγρασία εσωτερικού χώρου</h2>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="var(--gridline)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
+                <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit="%" width={48} domain={[0, 100]} />
+                <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
+                <Line type="monotone" dataKey="rh_in_pct" name="RH" stroke="var(--series-1)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </section>
+
+          <section className="chart-card">
+            <h2>VPD (έλλειμμα πίεσης υδρατμών)</h2>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="var(--gridline)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
+                <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" kPa" width={56} />
+                <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
+                <Line type="monotone" dataKey="vpd_kpa" name="VPD" stroke="var(--series-2)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </section>

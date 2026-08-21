@@ -1,6 +1,6 @@
 from datetime import date
 
-from twin.crop_model import CropState, TomatoCropModel
+from twin.crop_model import CropState, TomatoCropModel, _temperature_response, _vpd_response
 from twin.params import CropParams
 
 
@@ -90,3 +90,31 @@ def test_density_above_reference_does_not_increase_assimilation():
     dense_result = dense.step(state, temp_in_c=22.0, co2_in_ppm=900.0, solar_rad_w_m2=500.0, dt_hours=1.0)
 
     assert dense_result.gross_assimilation_kg_co2_m2_hour == reference_result.gross_assimilation_kg_co2_m2_hour
+
+
+def test_temperature_response_never_exceeds_one():
+    # Regression check for a fixed bug: since T_OPT isn't equidistant from
+    # T_MIN/T_MAX, the raw normalized product function could exceed 1.0
+    # (peaked ~1.15 around 20-25C -- this greenhouse's normal operating range).
+    for t in range(int(0), int(40)):
+        assert _temperature_response(float(t)) <= 1.0
+
+
+def test_vpd_response_never_exceeds_one_and_peaks_at_optimum():
+    for v in [x / 10.0 for x in range(0, 30)]:
+        assert _vpd_response(v) <= 1.0
+    assert _vpd_response(0.85) == 1.0
+
+
+def test_high_vpd_reduces_gross_assimilation():
+    model = TomatoCropModel(_crop_params(), ground_area_m2=5000)
+    state = CropState(days_after_planting=40.0, leaf_area_index=2.0, standing_dry_matter_g_m2=500.0)
+
+    optimal_vpd = model.step(
+        state, temp_in_c=22.0, co2_in_ppm=900.0, solar_rad_w_m2=500.0, dt_hours=1.0, vpd_kpa=0.85
+    )
+    stressful_vpd = model.step(
+        state, temp_in_c=22.0, co2_in_ppm=900.0, solar_rad_w_m2=500.0, dt_hours=1.0, vpd_kpa=1.9
+    )
+
+    assert stressful_vpd.gross_assimilation_kg_co2_m2_hour < optimal_vpd.gross_assimilation_kg_co2_m2_hour
