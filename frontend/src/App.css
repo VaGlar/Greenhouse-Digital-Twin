@@ -20,9 +20,10 @@
   --humidity: #0f8f9c; /* RH / VPD */
   --amber: #b8760a;
 
-  max-width: 960px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 32px 20px 64px;
+  padding: 32px 32px 64px;
+  box-sizing: border-box;
   font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--text-primary);
   background: var(--page);
@@ -210,12 +211,18 @@
   font-variant-numeric: tabular-nums;
 }
 
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
 .chart-card {
   background: var(--surface-1);
   border: 1px solid var(--gridline);
   border-radius: 10px;
   padding: 16px;
-  margin-bottom: 20px;
 }
 
 .chart-card h2 {
