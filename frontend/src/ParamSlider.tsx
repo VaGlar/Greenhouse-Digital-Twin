@@ -6,12 +6,13 @@ interface ParamSliderProps {
   max: number;
   step: number;
   optimal?: [number, number];
+  note?: string;
   onChange: (value: number) => void;
 }
 
 /** Slider with an optional highlighted "optimal" band, in the style of the
  * earlier greenhouse mockup — value pill turns amber outside the band. */
-export function ParamSlider({ label, value, unit, min, max, step, optimal, onChange }: ParamSliderProps) {
+export function ParamSlider({ label, value, unit, min, max, step, optimal, note, onChange }: ParamSliderProps) {
   const inOptimal = optimal ? value >= optimal[0] && value <= optimal[1] : true;
   const pct = ((value - min) / (max - min)) * 100;
   const optL = optimal ? ((optimal[0] - min) / (max - min)) * 100 : 0;
@@ -58,6 +59,7 @@ export function ParamSlider({ label, value, unit, min, max, step, optimal, onCha
           </span>
         </div>
       )}
+      {note && <p className="param-slider-note">ⓘ {note}</p>}
     </div>
   );
 }

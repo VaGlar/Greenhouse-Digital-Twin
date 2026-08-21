@@ -36,6 +36,7 @@ interface SliderDef {
   max: number;
   step: number;
   optimal?: [number, number];
+  note?: string;
 }
 
 interface SliderGroup {
@@ -89,10 +90,14 @@ const SLIDER_GROUPS: SliderGroup[] = [
         key: "co2_setpoint_day_ppm",
         label: "CO₂ ημέρας",
         unit: " ppm",
-        min: 400,
-        max: 1200,
+        min: 0,
+        max: 1000,
         step: 25,
-        optimal: [700, 1000],
+        // Study testing 500/700/850/1000 ppm on tomato found 700ppm optimal, no
+        // yield benefit above it — see papers/tomato-co2-optimum-700ppm.md.
+        // Min=0 covers greenhouses that don't dose CO2 at all (ambient ~420ppm only).
+        optimal: [650, 750],
+        note: "0ppm = καθόλου ανθρακολίπανση (μόνο ambient CO2). Πάνω από ~700ppm το μοντέλο δεν δίνει επιπλέον yield.",
       },
     ],
   },
@@ -118,6 +123,7 @@ const SLIDER_GROUPS: SliderGroup[] = [
         // Literature range for greenhouse tomato RH is 60-85% (day 80-85%, night 65-75%);
         // 70% specifically cited as the pollination optimum — see docs/assumptions/climate-control.md
         optimal: [65, 75],
+        note: "Το εύρος 65-75% είναι το βέλτιστο για επικονίαση. Για μέγιστο yield (βέλτιστο VPD ~0.85 kPa), το μοντέλο ευνοεί πιο ξηρό αέρα (~56-68% RH ανάλογα με τη θερμοκρασία) — trade-off μεταξύ επικονίασης και φωτοσύνθεσης.",
       },
     ],
   },
@@ -226,6 +232,7 @@ function App() {
                   max={s.max}
                   step={s.step}
                   optimal={s.optimal}
+                  note={s.note}
                   value={sliderValues[s.key]}
                   onChange={(v) => setSliderValues((prev) => ({ ...prev, [s.key]: v }))}
                 />

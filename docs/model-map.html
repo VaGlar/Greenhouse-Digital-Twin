@@ -1,0 +1,521 @@
+<title>Model Wiring Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #f6f7f2;
+    --surface: #ffffff;
+    --surface-2: #eef0e8;
+    --ink: #1a2318;
+    --ink-dim: #565f4f;
+    --line: #d7dbcd;
+    --line-strong: #b9c0a9;
+
+    --accent-weather: #8a6a3a;
+    --accent-weather-bg: #f1e9da;
+    --accent-climate: #2a5c8a;
+    --accent-climate-bg: #e6eef5;
+    --accent-crop: #2f6b34;
+    --accent-crop-bg: #e8f0e4;
+    --accent-output: #6b4a8a;
+    --accent-output-bg: #eee7f5;
+
+    --tag-sourced: #1a7a3d;
+    --tag-placeholder: #9a6b0a;
+    --tag-site: #1f5c99;
+    --tag-physical: #6b6b63;
+
+    --shadow: 0 1px 2px rgba(26,35,24,0.06), 0 4px 14px rgba(26,35,24,0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11150e;
+      --surface: #171c14;
+      --surface-2: #1e2418;
+      --ink: #e9ecdf;
+      --ink-dim: #a2ab92;
+      --line: #2c3324;
+      --line-strong: #3c452f;
+
+      --accent-weather: #d9a45f;
+      --accent-weather-bg: #2a2013;
+      --accent-climate: #6fa8d9;
+      --accent-climate-bg: #172431;
+      --accent-crop: #6fbf74;
+      --accent-crop-bg: #16260f;
+      --accent-output: #b79bdb;
+      --accent-output-bg: #241c30;
+
+      --tag-sourced: #5fbf7d;
+      --tag-placeholder: #d9a441;
+      --tag-site: #6fa8d9;
+      --tag-physical: #9a9a90;
+
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #11150e;
+    --surface: #171c14;
+    --surface-2: #1e2418;
+    --ink: #e9ecdf;
+    --ink-dim: #a2ab92;
+    --line: #2c3324;
+    --line-strong: #3c452f;
+
+    --accent-weather: #d9a45f;
+    --accent-weather-bg: #2a2013;
+    --accent-climate: #6fa8d9;
+    --accent-climate-bg: #172431;
+    --accent-crop: #6fbf74;
+    --accent-crop-bg: #16260f;
+    --accent-output: #b79bdb;
+    --accent-output-bg: #241c30;
+
+    --tag-sourced: #5fbf7d;
+    --tag-placeholder: #d9a441;
+    --tag-site: #6fa8d9;
+    --tag-physical: #9a9a90;
+
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 20px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  header.masthead {
+    margin-bottom: 8px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.6rem, 3vw, 2.3rem);
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+
+  .lede {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--ink-dim);
+    max-width: 68ch;
+    margin: 0 0 36px;
+  }
+
+  .lede strong { color: var(--ink); font-weight: 500; }
+
+  .diagram-wrap {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 4px;
+    margin-bottom: 12px;
+  }
+
+  .diagram-scroll {
+    overflow-x: auto;
+  }
+
+  figure { margin: 0; }
+
+  svg { display: block; width: 100%; height: auto; min-width: 1300px; }
+
+  figcaption {
+    font-size: 0.82rem;
+    color: var(--ink-dim);
+    padding: 14px 20px 6px;
+    border-top: 1px solid var(--line);
+    margin-top: 4px;
+  }
+
+  /* ---- legend ---- */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    margin: 28px 0 44px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: none;
+  }
+
+  /* ---- module detail cards ---- */
+  .modules {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+  }
+
+  .module-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--card-accent, var(--line-strong));
+    border-radius: 10px;
+    padding: 18px 20px 20px;
+  }
+
+  .module-card h2 {
+    font-family: "Archivo", sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: var(--card-accent, var(--ink));
+  }
+
+  .module-card .path {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--ink-dim);
+    margin: 0 0 12px;
+  }
+
+  .module-card ul {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .module-card li {
+    font-size: 0.85rem;
+    line-height: 1.45;
+    display: flex;
+    gap: 8px;
+  }
+
+  .module-card code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .tag {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 1px 6px;
+    border-radius: 4px;
+    flex: none;
+    margin-top: 1px;
+  }
+  .tag-sourced { color: var(--tag-sourced); background: color-mix(in srgb, var(--tag-sourced) 14%, transparent); }
+  .tag-placeholder { color: var(--tag-placeholder); background: color-mix(in srgb, var(--tag-placeholder) 14%, transparent); }
+  .tag-site { color: var(--tag-site); background: color-mix(in srgb, var(--tag-site) 14%, transparent); }
+  .tag-physical { color: var(--tag-physical); background: color-mix(in srgb, var(--tag-physical) 14%, transparent); }
+
+  footer.note {
+    margin-top: 40px;
+    font-size: 0.8rem;
+    color: var(--ink-dim);
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+    max-width: 68ch;
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">Greenhouse Digital Twin — internal reference</p>
+    <h1>How the pieces talk to each other</h1>
+    <p class="lede">
+      Every simulated hour, weather feeds the climate model, the climate model
+      and crop model hand values back and forth, and the crop model accumulates
+      into a season's yield. <strong>Config on the left is what you set once;
+      the loop in the middle runs every hour; the constants inside each box
+      are the individually-sourced numbers</strong> from <code>docs/assumptions/</code>.
+    </p>
+  </header>
+
+  <div class="diagram-wrap">
+    <div class="diagram-scroll">
+      <figure>
+        <svg viewBox="0 0 1720 1040" role="img" aria-label="Flow diagram: greenhouse configuration and weather feed the climate model; the climate model and crop model exchange temperature, CO2, VPD, transpiration and CO2 uptake every simulated hour; the crop model accumulates into fruit yield, which along with daily climate readings is served through the API to the frontend.">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <!-- ===================== COLUMN 1: CONFIG ===================== -->
+          <text x="40" y="36" font-family="Archivo, sans-serif" font-size="14" font-weight="700" fill="var(--accent-weather)">CONFIG (SET ONCE)</text>
+          <text x="40" y="54" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-dim)">config/greenhouse_example.yaml</text>
+
+          <!-- Geometry -->
+          <rect x="24" y="72" width="230" height="108" rx="8" fill="var(--accent-weather-bg)" stroke="var(--accent-weather)" stroke-width="1.2"/>
+          <text x="40" y="94" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">Geometry + CHP</text>
+          <text x="40" y="112" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">area_m2, cover_u_value,</text>
+          <text x="40" y="124" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">cover_transmissivity,</text>
+          <text x="40" y="136" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">chp.heat_to_power_ratio</text>
+          <text x="40" y="156" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">from real Geothermiki quote</text>
+          <rect x="40" y="164" width="66" height="13" rx="3" fill="none"/>
+          <text x="40" y="174" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-site)">SITE-SPECIFIC</text>
+
+          <!-- Climate control setpoints -->
+          <rect x="24" y="196" width="230" height="132" rx="8" fill="var(--accent-weather-bg)" stroke="var(--accent-weather)" stroke-width="1.2"/>
+          <text x="40" y="218" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">Climate control setpoints</text>
+          <text x="40" y="236" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">heating_setpoint_day/night_c</text>
+          <text x="40" y="248" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">co2_setpoint_day_ppm = 700</text>
+          <text x="40" y="260" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">screen_energy_saving = 0.55</text>
+          <text x="40" y="272" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">dehumidification_setpoint = 70%</text>
+          <text x="40" y="292" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">frontend sliders write here</text>
+          <text x="40" y="312" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-sourced)">SOURCED</text>
+          <text x="122" y="312" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-placeholder)">+ PLACEHOLDER</text>
+
+          <!-- Crop config -->
+          <rect x="24" y="344" width="230" height="112" rx="8" fill="var(--accent-weather-bg)" stroke="var(--accent-weather)" stroke-width="1.2"/>
+          <text x="40" y="366" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">Crop config</text>
+          <text x="40" y="384" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">density_plants_per_m2</text>
+          <text x="40" y="396" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">lai_max, fruiting_start_days</text>
+          <text x="40" y="408" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">fruit_partition_fraction_max</text>
+          <text x="40" y="428" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-sourced)">SOURCED</text>
+          <text x="122" y="428" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-placeholder)">+ PLACEHOLDER</text>
+
+          <!-- Weather config -->
+          <rect x="24" y="472" width="230" height="100" rx="8" fill="var(--accent-weather-bg)" stroke="var(--accent-weather)" stroke-width="1.2"/>
+          <text x="40" y="494" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">Weather config</text>
+          <text x="40" y="512" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">mean_annual_temp_c</text>
+          <text x="40" y="524" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">seasonal/diurnal_amplitude</text>
+          <text x="40" y="544" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-placeholder)">PLACEHOLDER</text>
+          <text x="130" y="544" font-family="IBM Plex Sans, sans-serif" font-size="9" fill="var(--ink-dim)">100% synthetic</text>
+
+          <!-- Arrows config -> weather generator / climate model -->
+          <path d="M254,126 C 320,126 300,240 372,240" fill="none" stroke="var(--accent-weather)" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <path d="M254,262 C 320,262 320,262 372,262" fill="none" stroke="var(--accent-weather)" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <path d="M254,400 C 330,400 330,300 372,284" fill="none" stroke="var(--accent-weather)" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <path d="M254,522 C 330,522 330,522 372,510" fill="none" stroke="var(--accent-weather)" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+          <!-- ===================== WEATHER GENERATOR (small, feeds climate) ===================== -->
+          <rect x="372" y="480" width="150" height="72" rx="8" fill="var(--accent-weather-bg)" stroke="var(--accent-weather)" stroke-width="1.4"/>
+          <text x="447" y="504" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="600" fill="var(--ink)">Weather</text>
+          <text x="447" y="518" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-dim)">twin/weather.py</text>
+          <text x="447" y="536" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="9" fill="var(--ink-dim)">hourly synthetic curve</text>
+
+          <path d="M522,516 C 570,516 570,470 610,440" fill="none" stroke="var(--accent-weather)" stroke-width="1.6" marker-end="url(#arrow)"/>
+          <text x="530" y="470" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--accent-weather)">temp_out_c, solar_rad, rh_out_pct</text>
+
+          <!-- ===================== CLIMATE MODEL ===================== -->
+          <text x="610" y="90" font-family="Archivo, sans-serif" font-size="14" font-weight="700" fill="var(--accent-climate)">CLIMATE MODEL</text>
+          <text x="610" y="108" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-dim)">twin/climate_model.py — runs every hour</text>
+
+          <rect x="600" y="126" width="330" height="430" rx="10" fill="var(--accent-climate-bg)" stroke="var(--accent-climate)" stroke-width="1.6"/>
+
+          <!-- energy balance -->
+          <rect x="620" y="146" width="290" height="118" rx="6" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="634" y="166" font-family="Archivo, sans-serif" font-size="11.5" font-weight="600" fill="var(--ink)">Energy balance</text>
+          <text x="634" y="184" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">solar gain − transmission loss</text>
+          <text x="634" y="198" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">+ fixed CHP heat − ventilation</text>
+          <text x="634" y="216" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--tag-placeholder)">screen: −55% loss at night</text>
+          <text x="634" y="230" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-dim)">→ temp_in_c</text>
+          <text x="634" y="250" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-sourced)">SOURCED</text>
+          <text x="716" y="250" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-placeholder)">+ PLACEHOLDER</text>
+
+          <!-- co2 balance -->
+          <rect x="620" y="274" width="290" height="100" rx="6" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="634" y="294" font-family="Archivo, sans-serif" font-size="11.5" font-weight="600" fill="var(--ink)">CO2 balance</text>
+          <text x="634" y="312" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">ventilation exchange + fixed CHP</text>
+          <text x="634" y="326" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">dosing, minus crop uptake</text>
+          <text x="634" y="344" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--tag-sourced)">capped at 700ppm</text>
+          <text x="634" y="358" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-dim)">→ co2_in_ppm</text>
+
+          <!-- humidity balance -->
+          <rect x="620" y="386" width="290" height="150" rx="6" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="634" y="406" font-family="Archivo, sans-serif" font-size="11.5" font-weight="600" fill="var(--ink)">Humidity balance</text>
+          <text x="634" y="424" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">crop transpiration in, ventilation</text>
+          <text x="634" y="438" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">out, condensation on cold cover,</text>
+          <text x="634" y="452" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">active dehumidification to setpoint</text>
+          <text x="634" y="472" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--tag-placeholder)">dew point vs. cover temp</text>
+          <text x="634" y="486" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-dim)">→ vapor_pressure_kpa → RH%, VPD</text>
+          <text x="634" y="506" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-sourced)">SOURCED</text>
+          <text x="716" y="506" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-placeholder)">+ PLACEHOLDER</text>
+
+          <!-- ===================== CROP MODEL ===================== -->
+          <text x="990" y="90" font-family="Archivo, sans-serif" font-size="14" font-weight="700" fill="var(--accent-crop)">CROP MODEL</text>
+          <text x="990" y="108" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-dim)">twin/crop_model.py — runs every hour</text>
+
+          <rect x="980" y="126" width="330" height="430" rx="10" fill="var(--accent-crop-bg)" stroke="var(--accent-crop)" stroke-width="1.6"/>
+
+          <!-- LAI -->
+          <rect x="1000" y="146" width="290" height="100" rx="6" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="1014" y="166" font-family="Archivo, sans-serif" font-size="11.5" font-weight="600" fill="var(--ink)">Leaf area (LAI)</text>
+          <text x="1014" y="184" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">density × time-ramp × CO2 boost</text>
+          <text x="1014" y="200" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--tag-sourced)">CO2 boost: +26.88% at 700ppm</text>
+          <text x="1014" y="214" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-dim)">(the season-long compounding channel)</text>
+          <text x="1014" y="232" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-sourced)">SOURCED</text>
+
+          <!-- photosynthesis -->
+          <rect x="1000" y="256" width="290" height="128" rx="6" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="1014" y="276" font-family="Archivo, sans-serif" font-size="11.5" font-weight="600" fill="var(--ink)">Gross assimilation</text>
+          <text x="1014" y="294" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">P_MAX × f(light) × f(CO2)</text>
+          <text x="1014" y="308" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">        × f(temp) × f(VPD)</text>
+          <text x="1014" y="326" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--tag-sourced)">VPD optimum: 0.85 kPa</text>
+          <text x="1014" y="340" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--tag-sourced)">T optimum: 27°C</text>
+          <text x="1014" y="354" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-dim)">each f() clamped to [0,1]</text>
+          <text x="1014" y="372" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-sourced)">SOURCED</text>
+          <text x="1096" y="372" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-placeholder)">+ PLACEHOLDER</text>
+
+          <!-- respiration + partition -->
+          <rect x="1000" y="396" width="290" height="140" rx="6" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="1014" y="416" font-family="Archivo, sans-serif" font-size="11.5" font-weight="600" fill="var(--ink)">Respiration → partition → yield</text>
+          <text x="1014" y="434" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">− maintenance respiration (day+night)</text>
+          <text x="1014" y="448" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">→ net dry matter → stage-dependent</text>
+          <text x="1014" y="462" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">fruit partition (0 until day 35)</text>
+          <text x="1014" y="482" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--tag-sourced)">partition max: 85% of growth</text>
+          <text x="1014" y="496" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-dim)">→ fruit_fresh_yield_kg_m2</text>
+          <text x="1014" y="516" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-sourced)">SOURCED</text>
+
+          <!-- feedback loop climate <-> crop -->
+          <path d="M910,220 C 950,220 960,220 1000,220" fill="none" stroke="var(--accent-crop)" stroke-width="1.6" marker-end="url(#arrow)"/>
+          <text x="915" y="212" font-family="IBM Plex Mono, monospace" font-size="8.5" fill="var(--accent-climate)">temp_in_c, co2_in_ppm, vpd_kpa</text>
+
+          <path d="M1000,330 C 960,330 950,330 910,330" fill="none" stroke="var(--accent-climate)" stroke-width="1.6" marker-end="url(#arrow)"/>
+          <text x="918" y="322" font-family="IBM Plex Mono, monospace" font-size="8.5" fill="var(--accent-crop)">co2 uptake, transpiration</text>
+
+          <text x="955" y="600" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="600" fill="var(--ink-dim)">↻ exchanged every simulated hour</text>
+
+          <!-- ===================== OUTPUTS ===================== -->
+          <text x="1370" y="90" font-family="Archivo, sans-serif" font-size="14" font-weight="700" fill="var(--accent-output)">OUTPUTS</text>
+
+          <rect x="1360" y="146" width="330" height="120" rx="8" fill="var(--accent-output-bg)" stroke="var(--accent-output)" stroke-width="1.4"/>
+          <text x="1376" y="170" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">Accumulated over the season</text>
+          <text x="1376" y="190" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">fruit_fresh_yield_kg_m2</text>
+          <text x="1376" y="204" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">standing_dry_matter_g_m2</text>
+          <text x="1376" y="224" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">150 daily rows returned per run</text>
+          <text x="1376" y="248" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="var(--tag-physical)">DERIVED</text>
+
+          <rect x="1360" y="286" width="330" height="110" rx="8" fill="var(--accent-output-bg)" stroke="var(--accent-output)" stroke-width="1.4"/>
+          <text x="1376" y="310" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">api/main.py</text>
+          <text x="1376" y="328" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">POST /simulate</text>
+          <text x="1376" y="342" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-dim)">GET /config</text>
+          <text x="1376" y="362" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">daily_series: temp, CO2, RH, VPD, yield</text>
+          <text x="1376" y="382" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">SimulateRequest overrides run params</text>
+
+          <rect x="1360" y="416" width="330" height="120" rx="8" fill="var(--accent-output-bg)" stroke="var(--accent-output)" stroke-width="1.4"/>
+          <text x="1376" y="440" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">frontend/ (React)</text>
+          <text x="1376" y="458" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">Sliders per group: Καλλιέργεια,</text>
+          <text x="1376" y="472" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">Κλίμα, Υγρασία, Προσομοίωση</text>
+          <text x="1376" y="490" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="var(--ink-dim)">6 charts: temp, CO2, RH, VPD, yield</text>
+          <text x="1376" y="510" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-dim)">writes overrides → POST /simulate</text>
+
+          <path d="M930,548 C 1000,690 1250,690 1360,600" fill="none" stroke="var(--accent-output)" stroke-width="1.6" marker-end="url(#arrow)"/>
+          <text x="1050" y="700" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--accent-output)">every hour → resampled to daily rows</text>
+
+          <path d="M1590,206 C 1660,206 1660,206 1660,266" fill="none" stroke="var(--accent-output)" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <path d="M1590,341 C 1650,341 1650,341 1590,341" fill="none" stroke="var(--accent-output)" stroke-width="1.4" marker-end="url(#arrow)"/>
+          <path d="M1525,396 C 1525,406 1525,406 1525,416" fill="none" stroke="var(--accent-output)" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+          <!-- return loop: frontend override back to config -->
+          <path d="M1360,470 C 700,900 250,900 138,572" fill="none" stroke="var(--accent-output)" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+          <text x="600" y="918" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--accent-output)">slider changes override climate_control + crop config for next run (dashed = per-run, not persisted)</text>
+
+        </svg>
+      </figure>
+      <figcaption>
+        Left → right: config set once in <code>config/greenhouse_example.yaml</code> (or overridden per-run from the frontend, dashed
+        return path) feeds the weather generator and both models. Climate and crop models exchange state every simulated hour — the
+        solid loop in the middle — before the crop model's yield accumulates across the season and reaches the frontend through the API.
+      </figcaption>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:var(--tag-sourced)"></span>SOURCED — literature/engineering citation, see <code>papers/</code></span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--tag-placeholder)"></span>PLACEHOLDER — plausible estimate, no specific citation yet</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--tag-site)"></span>SITE-SPECIFIC — real design value for this greenhouse</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--tag-physical)"></span>DERIVED / physical constant — computed or a physics fact, not a modeling choice</span>
+  </div>
+
+  <div class="modules">
+    <div class="module-card" style="--card-accent:var(--accent-weather)">
+      <h2>Weather</h2>
+      <p class="path">twin/weather.py</p>
+      <ul>
+        <li><span class="tag tag-placeholder">PH</span>100% synthetic sine curves — no real historical data yet, the single highest-value future upgrade</li>
+        <li><span class="tag tag-site">SS</span><code>latitude_deg</code> is stored but unused by the generator</li>
+      </ul>
+    </div>
+    <div class="module-card" style="--card-accent:var(--accent-climate)">
+      <h2>Climate Model</h2>
+      <p class="path">twin/climate_model.py</p>
+      <ul>
+        <li><span class="tag tag-sourced">SO</span>CHP heat/CO2 output is fixed (grid-driven) — surplus is dumped/vented, never throttled to demand</li>
+        <li><span class="tag tag-placeholder">PH</span>condensation uses an engineering-approximated cover surface temperature, not a measured one</li>
+      </ul>
+    </div>
+    <div class="module-card" style="--card-accent:var(--accent-crop)">
+      <h2>Crop Model</h2>
+      <p class="path">twin/crop_model.py</p>
+      <ul>
+        <li><span class="tag tag-sourced">SO</span>CO2's real yield effect is mostly bigger leaves (LAI), not faster instant photosynthesis — both channels are modeled</li>
+        <li><span class="tag tag-placeholder">PH</span>senescence/leaf drop still not modeled — biomass never shrinks from aging, only from respiration</li>
+      </ul>
+    </div>
+    <div class="module-card" style="--card-accent:var(--accent-output)">
+      <h2>API + Frontend</h2>
+      <p class="path">api/main.py, frontend/</p>
+      <ul>
+        <li><span class="tag tag-physical">DE</span>structural values (area, CHP size) stay backend-only by design — never a per-run slider</li>
+        <li><span class="tag tag-physical">DE</span>every run returns a fresh result; no history or scenario comparison stored yet</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="note">
+    Generated 2026-08-20 from the current state of <code>twin/</code>, <code>api/</code> and <code>frontend/</code>. When a value here
+    changes, update this map alongside the code comment and <code>docs/assumptions/</code> entry — same rule as everywhere else in the project.
+  </footer>
+
+</div>

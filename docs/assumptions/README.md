@@ -15,6 +15,7 @@ This folder is the audit trail for every non-obvious number in `config/greenhous
 - [`climate-control.md`](./climate-control.md) — setpoints, ventilation, CO2 dosing
 - [`crop-model.md`](./crop-model.md) — photosynthesis, growth, yield (`twin/crop_model.py`)
 - [`weather.md`](./weather.md) — synthetic weather generator
+- [`../model-map.html`](../model-map.html) — visual wiring map of how config/weather/climate model/crop model/API/frontend connect (open in a browser; also published as a shareable [Claude artifact](https://claude.ai/code/artifact/7e7a74eb-ed2c-4a83-9a5d-b8639eedc3b5))
 
 ## Going forward
 

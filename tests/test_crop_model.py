@@ -1,6 +1,6 @@
 from datetime import date
 
-from twin.crop_model import CropState, TomatoCropModel, _temperature_response, _vpd_response
+from twin.crop_model import CropState, TomatoCropModel, _lai, _temperature_response, _vpd_response
 from twin.params import CropParams
 
 
@@ -118,3 +118,23 @@ def test_high_vpd_reduces_gross_assimilation():
     )
 
     assert stressful_vpd.gross_assimilation_kg_co2_m2_hour < optimal_vpd.gross_assimilation_kg_co2_m2_hour
+
+
+def test_co2_enrichment_boosts_lai_growth():
+    # CO2 enrichment grows more/bigger leaves (not just faster instantaneous
+    # photosynthesis) -- this is the season-long compounding channel behind
+    # real CO2-enrichment yield gains that a single per-hour multiplier can't
+    # represent on its own.
+    params = _crop_params()
+    ambient_lai = _lai(params, days_after_planting=40.0, co2_ppm=420.0)
+    enriched_lai = _lai(params, days_after_planting=40.0, co2_ppm=700.0)
+
+    assert enriched_lai > ambient_lai
+
+
+def test_co2_lai_boost_caps_at_saturation_ppm():
+    params = _crop_params()
+    at_saturation = _lai(params, days_after_planting=40.0, co2_ppm=700.0)
+    above_saturation = _lai(params, days_after_planting=40.0, co2_ppm=1200.0)
+
+    assert at_saturation == above_saturation

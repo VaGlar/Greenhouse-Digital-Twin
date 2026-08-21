@@ -33,7 +33,8 @@ climate_control:
   vent_temp_margin_c: 2.0          # PLACEHOLDER: control-engineering choice, not tomato-specific source
   vent_max_ach: 15.0               # PLACEHOLDER: plausible order of magnitude, not benchmarked to real vent design
   vent_min_ach: 0.5                # PLACEHOLDER: generic baseline leakage assumption
-  co2_setpoint_day_ppm: 900.0      # SOURCED: within cited optimal CO2 enrichment range 700-1000ppm, same review source
+  co2_setpoint_day_ppm: 700.0       # SOURCED: corrected from 900 -- specific study testing 500/700/850/1000ppm
+                                     # found 700ppm optimal, no yield benefit above it (papers/tomato-co2-optimum-700ppm.md)
   co2_ambient_ppm: 420.0           # SOURCED, factual: current global atmospheric CO2 (~420-425ppm, NOAA/Mauna Loa)
   effective_heat_capacity_j_m2k: 40000.0  # PLACEHOLDER: lumped single-zone thermal mass estimate, not measured
   screen_energy_saving_fraction: 0.55  # SOURCED: real thermal screen spec (type PH55), deployed at night
