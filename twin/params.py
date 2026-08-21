@@ -86,6 +86,10 @@ class ClimateControlParams:
     co2_setpoint_day_ppm: float = 900.0
     co2_ambient_ppm: float = 420.0
     effective_heat_capacity_j_m2k: float = 40_000.0  # lumped thermal mass per m2 floor area
+    # SOURCED: fraction of transmission heat loss cut when the thermal screen is deployed at
+    # night. Real product spec (Ludvig Svensson-style PH55, 55% shading/55% energy saving) from
+    # a real vendor quote for this greenhouse. See papers/geothermiki-s192g-quote.md.
+    screen_energy_saving_fraction: float = 0.55
 
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
@@ -94,6 +98,8 @@ class ClimateControlParams:
             raise ValueError("vent_max_ach must be >= vent_min_ach")
         if self.effective_heat_capacity_j_m2k <= 0:
             raise ValueError("effective_heat_capacity_j_m2k must be > 0")
+        if not 0 <= self.screen_energy_saving_fraction < 1:
+            raise ValueError("screen_energy_saving_fraction must be in [0, 1)")
 
     def is_daytime(self, hour: int) -> bool:
         return self.day_start_hour <= hour < self.day_end_hour

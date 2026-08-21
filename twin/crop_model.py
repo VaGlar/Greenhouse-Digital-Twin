@@ -137,9 +137,14 @@ class TomatoCropModel:
         )
 
         net_dry_matter_g_m2_hour = gross_dry_matter_g_m2_hour * dt_hours - respiration_g_m2_hour * dt_hours
-        # Standing biomass cannot shrink below its current value in this MVP
-        # (no senescence/abscission modeled yet).
-        new_standing_dm = max(state.standing_dry_matter_g_m2, state.standing_dry_matter_g_m2 + net_dry_matter_g_m2_hour)
+        # Maintenance respiration legitimately consumes standing biomass hour to hour
+        # (real plants do lose dry matter to respiration overnight) -- only floored at
+        # zero as a physical sanity bound. This is distinct from senescence/abscission
+        # (programmed tissue death/leaf drop), which is a separate process still not
+        # modeled here. Fixed 2026-08-20: an earlier `max(current, current+net)` clamp
+        # discarded every hour's respiration loss entirely, silently making nighttime
+        # temperature (and therefore the thermal screen) have zero effect on yield.
+        new_standing_dm = max(0.0, state.standing_dry_matter_g_m2 + net_dry_matter_g_m2_hour)
 
         fruit_fraction = _fruit_partition_fraction(self.params, state.days_after_planting)
         new_growth_g_m2 = max(0.0, net_dry_matter_g_m2_hour)

@@ -36,6 +36,8 @@ climate_control:
   co2_setpoint_day_ppm: 900.0      # SOURCED: within cited optimal CO2 enrichment range 700-1000ppm, same review source
   co2_ambient_ppm: 420.0           # SOURCED, factual: current global atmospheric CO2 (~420-425ppm, NOAA/Mauna Loa)
   effective_heat_capacity_j_m2k: 40000.0  # PLACEHOLDER: lumped single-zone thermal mass estimate, not measured
+  screen_energy_saving_fraction: 0.55  # SOURCED: real thermal screen spec (type PH55), deployed at night
+                                         # (papers/geothermiki-s192g-quote.md — 55% shading / 55% energy saving)
 
 crop:
   variety: "Beefsteak tomato"      # site-specific placeholder

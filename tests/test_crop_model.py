@@ -67,6 +67,18 @@ def test_lower_density_reduces_assimilation_below_reference():
     assert sparse_result.gross_assimilation_kg_co2_m2_hour < reference_result.gross_assimilation_kg_co2_m2_hour
 
 
+def test_nighttime_respiration_reduces_standing_biomass():
+    # No light (solar_rad=0) -> gross_assimilation=0 -> only respiration acts.
+    # Regression check for a fixed bug where standing biomass was floored at its
+    # previous value, silently discarding every hour of nighttime respiration.
+    model = TomatoCropModel(_crop_params(), ground_area_m2=5000)
+    state = CropState(days_after_planting=40.0, standing_dry_matter_g_m2=500.0)
+
+    result = model.step(state, temp_in_c=18.0, co2_in_ppm=420.0, solar_rad_w_m2=0.0, dt_hours=1.0)
+
+    assert result.state.standing_dry_matter_g_m2 < state.standing_dry_matter_g_m2
+
+
 def test_density_above_reference_does_not_increase_assimilation():
     # Beyond canopy closure, extra plants add no more leaf area in this
     # simplified model — density is capped at reference_density_plants_per_m2.
