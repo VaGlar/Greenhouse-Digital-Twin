@@ -1,0 +1,16 @@
+{
+  "name": "Greenhouse Digital Twin",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "postCreateCommand": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cd frontend && npm install",
+  "forwardPorts": [8123, 5173],
+  "portsAttributes": {
+    "8123": {
+      "label": "Backend API",
+      "onAutoForward": "notify"
+    },
+    "5173": {
+      "label": "Frontend",
+      "onAutoForward": "openPreview"
+    }
+  }
+}
