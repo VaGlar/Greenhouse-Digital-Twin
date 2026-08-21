@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import "./App.css";
 import { ParamSlider } from "./ParamSlider";
+import { GreenhouseSchematic, type ZoneKey } from "./GreenhouseSchematic";
 import {
   getConfig,
   runSimulation,
@@ -42,31 +43,16 @@ interface SliderDef {
 interface SliderGroup {
   key: string;
   label: string;
+  /** Matching GreenhouseSchematic zone — clicking that zone scrolls here. */
+  zone: ZoneKey | null;
   sliders: SliderDef[];
 }
 
 const SLIDER_GROUPS: SliderGroup[] = [
   {
-    key: "crop",
-    label: "🍅 Καλλιέργεια",
-    sliders: [
-      {
-        key: "crop_density_plants_per_m2",
-        label: "Πυκνότητα φυτών",
-        unit: " φ/m²",
-        min: 2,
-        max: 5,
-        step: 0.25,
-        // Commercial single-stem high-wire greenhouse tomato: 2.3-2.5 plants/m2
-        // is standard practice, pushed toward ~3 with a second stem per plant
-        // (Peet & Welles, Greenhouse Tomato Production; VT Extension SPES-474).
-        optimal: [2.3, 3.0],
-      },
-    ],
-  },
-  {
     key: "climate",
     label: "🌡️ Κλίμα",
+    zone: "climate",
     sliders: [
       {
         key: "heating_setpoint_day_c",
@@ -104,6 +90,7 @@ const SLIDER_GROUPS: SliderGroup[] = [
   {
     key: "humidity",
     label: "💧 Υγρασία",
+    zone: "humidity",
     sliders: [
       {
         key: "screen_energy_saving_fraction_pct",
@@ -128,8 +115,28 @@ const SLIDER_GROUPS: SliderGroup[] = [
     ],
   },
   {
+    key: "crop",
+    label: "🍅 Καλλιέργεια",
+    zone: "crop",
+    sliders: [
+      {
+        key: "crop_density_plants_per_m2",
+        label: "Πυκνότητα φυτών",
+        unit: " φ/m²",
+        min: 2,
+        max: 5,
+        step: 0.25,
+        // Commercial single-stem high-wire greenhouse tomato: 2.3-2.5 plants/m2
+        // is standard practice, pushed toward ~3 with a second stem per plant
+        // (Peet & Welles, Greenhouse Tomato Production; VT Extension SPES-474).
+        optimal: [2.3, 3.0],
+      },
+    ],
+  },
+  {
     key: "run",
     label: "📅 Προσομοίωση",
+    zone: null,
     sliders: [
       { key: "duration_days", label: "Διάρκεια", unit: " μέρες", min: 30, max: 300, step: 10 },
     ],
@@ -151,7 +158,7 @@ function App() {
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeGroup, setActiveGroup] = useState(SLIDER_GROUPS[0].key);
+  const [activeZone, setActiveZone] = useState<ZoneKey | null>(null);
   const [sliderValues, setSliderValues] = useState<Record<SliderKey, number>>(DEFAULT_SLIDER_VALUES);
   const [cropVariety, setCropVariety] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -194,35 +201,59 @@ function App() {
     }
   }
 
+  function handleZoneClick(zone: ZoneKey) {
+    setActiveZone(zone);
+    const group = SLIDER_GROUPS.find((g) => g.zone === zone);
+    if (group) {
+      document.getElementById(`zone-${group.key}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  const latestDay = result?.daily_series.at(-1) ?? null;
+
   return (
     <div className="viz-root">
       <header className="header">
-        <h1>Greenhouse Digital Twin</h1>
+        <div className="header-title-row">
+          <h1>Greenhouse Digital Twin</h1>
+          {config && (
+            <span className="header-badge">{config.crop.variety || "—"}</span>
+          )}
+        </div>
         {config && (
           <p className="config-summary">
             {config.name} &middot; {config.geometry.area_m2.toLocaleString()} m&sup2; &middot;{" "}
-            {config.chp.electric_power_kw.toLocaleString()} kW CHP &middot; {config.crop.variety}
+            {config.chp.electric_power_kw.toLocaleString()} kW CHP
+            {result && (
+              <>
+                {" "}&middot; ημέρα {result.summary.duration_days} &middot; yield{" "}
+                {result.summary.final_yield_kg_m2.toFixed(2)} kg/m²
+              </>
+            )}
           </p>
         )}
       </header>
 
+      <GreenhouseSchematic
+        activeZone={activeZone}
+        onZoneClick={handleZoneClick}
+        outdoorTempC={latestDay?.temp_out_c ?? null}
+        indoorTempC={latestDay?.temp_in_c ?? null}
+        rhPct={latestDay?.rh_in_pct ?? null}
+        vpdKpa={latestDay?.vpd_kpa ?? null}
+        co2Ppm={latestDay?.co2_in_ppm ?? null}
+        screenSavingPct={sliderValues.screen_energy_saving_fraction_pct}
+        dehumidSetpointPct={sliderValues.dehumidification_setpoint_pct}
+        yieldKgM2={latestDay?.fruit_fresh_yield_kg_m2 ?? null}
+      />
+
       <section className="form-card">
         <h2>Παράμετροι προσομοίωσης</h2>
-        <div className="form-groups">
-          {SLIDER_GROUPS.map((g) => (
-            <button
-              key={g.key}
-              className={`form-group-tab ${activeGroup === g.key ? "active" : ""}`}
-              onClick={() => setActiveGroup(g.key)}
-            >
-              {g.label}
-            </button>
-          ))}
-        </div>
 
-        {SLIDER_GROUPS.map((g) =>
-          activeGroup !== g.key ? null : (
-            <div className="form-fields" key={g.key}>
+        {SLIDER_GROUPS.map((g) => (
+          <div className="form-fields" id={`zone-${g.key}`} key={g.key}>
+            <h3 className="form-group-heading">{g.label}</h3>
+            <div className="form-fields-grid">
               {g.sliders.map((s) => (
                 <ParamSlider
                   key={s.key}
@@ -260,8 +291,8 @@ function App() {
                 </div>
               )}
             </div>
-          )
-        )}
+          </div>
+        ))}
       </section>
 
       <button className="run-button" onClick={handleRun} disabled={loading}>
@@ -314,7 +345,7 @@ function App() {
                 <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
                 <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit="%" width={48} domain={[0, 100]} />
                 <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
-                <Line type="monotone" dataKey="rh_in_pct" name="RH" stroke="var(--series-1)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="rh_in_pct" name="RH" stroke="var(--humidity)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </section>
@@ -327,7 +358,7 @@ function App() {
                 <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
                 <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" kPa" width={56} />
                 <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
-                <Line type="monotone" dataKey="vpd_kpa" name="VPD" stroke="var(--series-2)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="vpd_kpa" name="VPD" stroke="var(--humidity)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </section>
