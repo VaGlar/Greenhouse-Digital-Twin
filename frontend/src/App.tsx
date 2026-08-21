@@ -309,6 +309,7 @@ function App() {
             <StatTile label="Διάρκεια" value={`${result.summary.duration_days} μέρες`} />
           </section>
 
+          <div className="chart-grid">
           <section className="chart-card">
             <h2>Θερμοκρασία</h2>
             <ResponsiveContainer width="100%" height={260}>
@@ -375,6 +376,7 @@ function App() {
               </LineChart>
             </ResponsiveContainer>
           </section>
+          </div>
         </>
       )}
     </div>
