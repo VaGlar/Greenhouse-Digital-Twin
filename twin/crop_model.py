@@ -43,6 +43,13 @@ TRANSPIRATION_ENERGY_FRACTION = 0.70  # SOURCED: latent heat flux is 66.4-71.7% 
 LATENT_HEAT_OF_VAPORIZATION_J_KG = 2.45e6  # physical constant, water at ~20C (standard meteorological value,
 # e.g. FAO-56 Penman-Monteith reference)
 
+# VPD (vapor pressure deficit) response of photosynthesis -- stomata close under high VPD
+# (water-stress avoidance) and gas exchange suffers near saturation (low VPD) too.
+VPD_MIN_KPA = 0.2  # SOURCED: below the ~0.3-1.0 kPa cited optimal range
+VPD_OPT_KPA = 0.85  # SOURCED: mid of the 0.3-1.0 kPa optimal range / near the ~1 kPa reported peak
+VPD_MAX_KPA = 2.0  # SOURCED: "suitable VPD for tomato growth is less than 2 kPa"; stomatal closure
+# accelerates from ~1.5 kPa. See docs/assumptions/crop-model.md.
+
 
 @dataclass
 class CropState:
@@ -61,13 +68,21 @@ class CropStepResult:
 
 
 def _temperature_response(temp_c: float) -> float:
-    """Bell-shaped response, 0 outside [T_MIN, T_MAX], 1 at T_OPT."""
+    """Bell-shaped response, 0 outside [T_MIN, T_MAX], 1 at T_OPT.
+
+    Fixed 2026-08-20: the normalized product function (Yin et al. style) only
+    equals exactly 1 at T_OPT by construction -- when T_OPT isn't equidistant
+    from T_MIN/T_MAX (it isn't here: 27 vs. midpoint 22.5), the raw parabola's
+    true peak sits elsewhere and the ratio can exceed 1 there (was hitting
+    ~1.15 around 20-25C, exactly this greenhouse's normal operating range,
+    silently over-boosting photosynthesis this whole time). Clamped at 1.0.
+    """
     if temp_c <= T_MIN_C or temp_c >= T_MAX_C:
         return 0.0
     # Normalized product function (Yin et al. style), smooth and bounded in [0, 1].
     num = (temp_c - T_MIN_C) * (T_MAX_C - temp_c)
     den = (T_OPT_C - T_MIN_C) * (T_MAX_C - T_OPT_C)
-    return max(0.0, (num / den))
+    return min(1.0, max(0.0, (num / den)))
 
 
 def _light_response(solar_rad_w_m2: float) -> float:
@@ -76,6 +91,17 @@ def _light_response(solar_rad_w_m2: float) -> float:
 
 def _co2_response(co2_ppm: float) -> float:
     return co2_ppm / (co2_ppm + CO2_HALF_SAT_PPM)
+
+
+def _vpd_response(vpd_kpa: float) -> float:
+    """Bell-shaped response, 0 outside [VPD_MIN, VPD_MAX], 1 at VPD_OPT -- same
+    normalized product-function shape as _temperature_response, with the same
+    clamp at 1.0 (VPD_OPT isn't centered between VPD_MIN/VPD_MAX either)."""
+    if vpd_kpa <= VPD_MIN_KPA or vpd_kpa >= VPD_MAX_KPA:
+        return 0.0
+    num = (vpd_kpa - VPD_MIN_KPA) * (VPD_MAX_KPA - vpd_kpa)
+    den = (VPD_OPT_KPA - VPD_MIN_KPA) * (VPD_MAX_KPA - VPD_OPT_KPA)
+    return min(1.0, max(0.0, num / den))
 
 
 def _lai(params: CropParams, days_after_planting: float) -> float:
@@ -116,14 +142,16 @@ class TomatoCropModel:
         co2_in_ppm: float,
         solar_rad_w_m2: float,
         dt_hours: float,
+        vpd_kpa: float = VPD_OPT_KPA,
     ) -> CropStepResult:
         lai = _lai(self.params, state.days_after_planting)
 
         f_light = _light_response(solar_rad_w_m2)
         f_co2 = _co2_response(co2_in_ppm)
         f_temp = _temperature_response(temp_in_c)
+        f_vpd = _vpd_response(vpd_kpa)
 
-        p_gross_umol_m2_leaf_s = P_MAX_UMOL_M2_LEAF_S * f_light * f_co2 * f_temp
+        p_gross_umol_m2_leaf_s = P_MAX_UMOL_M2_LEAF_S * f_light * f_co2 * f_temp * f_vpd
         p_gross_umol_m2_ground_s = p_gross_umol_m2_leaf_s * lai
 
         # mol CO2 / m2 ground / hour -> kg CO2 / m2 ground / hour

@@ -39,6 +39,7 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
             co2_in_ppm=climate_state.co2_in_ppm,
             solar_rad_w_m2=row["solar_rad_w_m2"],
             dt_hours=dt_hours,
+            vpd_kpa=climate_state.vpd_kpa,
         )
         co2_uptake_kg_per_hour = crop_result.gross_assimilation_kg_co2_m2_hour * params.geometry.area_m2
         transpiration_kg_per_hour = crop_result.transpiration_kg_m2_hour * params.geometry.area_m2
@@ -71,6 +72,8 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
                 "co2_dumped_kg": climate_result.co2_dumped_kg,
                 "rh_in_pct": climate_result.rh_in_pct,
                 "vpd_kpa": climate_result.vpd_kpa,
+                "condensed_kg": climate_result.condensed_kg,
+                "dehumidified_kg": climate_result.dehumidified_kg,
                 "days_after_planting": crop_state.days_after_planting,
                 "leaf_area_index": crop_state.leaf_area_index,
                 "standing_dry_matter_g_m2": crop_state.standing_dry_matter_g_m2,

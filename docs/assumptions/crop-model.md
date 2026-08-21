@@ -29,6 +29,7 @@
 | `CANOPY_LIGHT_EXTINCTION_COEFF` | 0.75 (added 2026-08-20) | **SOURCED** | Beer-Lambert canopy light-interception coefficient, `1 - exp(-k*LAI)`. High-wire tomato canopies with horizontal leaf orientation are reported at k=0.7-0.9; used 0.75. Drives the transpiration calculation (see `climate-control.md` for the humidity model this feeds). Source: `papers/tomato-canopy-extinction-coefficient.md`. |
 | `TRANSPIRATION_ENERGY_FRACTION` | 0.70 (added 2026-08-20) | **SOURCED** | Fraction of canopy-intercepted solar energy converted to latent heat (transpiration) rather than sensible heat. A measured greenhouse tomato study found latent heat flux = 66.4-71.7% of net radiation; used 0.70 (mid). A simplification of the full Stanghellini/Penman-Monteith approach (no dynamic stomatal/VPD feedback) — a fixed fraction. Source: `papers/tomato-transpiration-latent-heat-fraction.md`. |
 | `LATENT_HEAT_OF_VAPORIZATION_J_KG` | 2.45e6 (added 2026-08-20) | **ΦΥΣΙΚΗ ΣΤΑΘΕΡΑ / physical constant** | Latent heat of vaporization of water at ~20°C. Standard meteorological value (e.g. FAO-56 Penman-Monteith reference) — not a model assumption. |
+| `VPD_MIN_KPA, VPD_OPT_KPA, VPD_MAX_KPA` | 0.2, 0.85, 2.0 (added 2026-08-20) | **SOURCED** | Cardinal points for a bell-shaped VPD response multiplying gross photosynthesis (stomata close under high VPD; gas exchange also suffers near saturation). Literature: optimal range 0.3-1.0 kPa, peak near ~1 kPa, "suitable" VPD <2 kPa, markedly reduced photosynthesis from 1-1.5 kPa. Source: `papers/tomato-vpd-optimal-range.md`. |
 
 ## Humidity model (added 2026-08-20)
 
@@ -39,7 +40,19 @@
 
 **Saturation vapor pressure** uses the Tetens/Magnus formula (`_saturation_vapor_pressure_kpa`), a standard meteorological equation (FAO-56 Penman-Monteith reference, Allen et al. 1998) — not a model assumption, just physics.
 
-**Known simplification**: no condensation/dehumidification is modeled. Vapor pressure is simply capped at saturation (100% RH) when it would otherwise exceed it — real greenhouses lose excess moisture to condensation on the (colder) cover surface, which isn't tracked. Humidity currently feeds only the reported RH%/VPD outputs — it does **not** yet feed back into the crop model's photosynthesis or stomatal response (a further refinement, not done in this pass). In the default 150-day run: RH ranges ~26-100%, mean ~69%; VPD ranges 0-1.6 kPa, mean ~0.6 kPa — both plausible orders of magnitude for greenhouse tomato, not calibrated against this greenhouse's real sensors.
+## Update 2026-08-20: condensation/dehumidification + VPD feeds photosynthesis
+
+Both gaps noted above (the day this section was first written) are now closed:
+
+- **Passive condensation**: `twin/climate_model.py` now estimates a cover surface temperature (`cover_surface_temp_fraction`) and compares it to the interior air's dew point (`_dew_point_c`) — when the cover is colder, vapor pressure relaxes toward the cover's saturation point (`condensation_rate_constant`), removing moisture even when bulk air is well below 100% RH, matching how real greenhouse condensation works. See `climate-control.md` for the two new (PLACEHOLDER) rate parameters this needs.
+- **Active dehumidification**: an idealized setpoint controller (`dehumidification_setpoint_pct`, default 85%) represents the real quote's OptiClima cooling/dehumidification panels — modeled as unconstrained capacity (always reaches the setpoint), since no real capacity spec was available. Tracked as an open gap in `README.md`.
+- **VPD now feeds photosynthesis**: `_vpd_response()` multiplies gross assimilation the same way `_temperature_response()` does, using `VPD_MIN_KPA`/`VPD_OPT_KPA`/`VPD_MAX_KPA` (see table above).
+
+## Bug fix: response curves could exceed 1.0 (2026-08-20)
+
+While wiring VPD into photosynthesis, found that `_temperature_response()`'s "normalized product function" (Yin et al. style) only equals exactly 1.0 *at* T_OPT by construction — when T_OPT isn't equidistant from T_MIN/T_MAX (it isn't: T_OPT=27 vs. midpoint 22.5), the raw parabola's true peak sits elsewhere, and the ratio exceeds 1.0 there. It was hitting **~1.15 around 20-25°C** — exactly this greenhouse's normal operating range — meaning photosynthesis had been silently over-boosted this whole time (pre-existing, not something introduced by today's T_OPT change). The new `_vpd_response()` uses the identical shape and has the same flaw (VPD_OPT=0.85 isn't centered between 0.2 and 2.0 either). Both are now clamped at 1.0 (`min(1.0, ...)`). Regression tests added (`test_temperature_response_never_exceeds_one`, `test_vpd_response_never_exceeds_one_and_peaks_at_optimum`).
+
+**Combined effect of the VPD-photosynthesis link + this clamp fix**: baseline 150-day yield moved from 20.96 to **8.43 kg/m²** at the default 85% dehumidification setpoint — a large drop, but not a bug: most daytime hours now sit at VPD well below the 0.85 kPa optimum (median ~0.39 kPa) because 85% RH is a fairly humid ceiling. See the sensitivity table in `climate-control.md`'s `dehumidification_setpoint_pct` row — this is a genuine, adjustable design trade-off now visible for the first time, not something to silently "fix" back to the old yield number.
 
 ## Bottom line
 

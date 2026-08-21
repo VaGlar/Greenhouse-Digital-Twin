@@ -23,5 +23,7 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`greenhouse-film-180micron-transmission.md`](./greenhouse-film-180micron-transmission.md) | `geometry.cover_transmissivity` |
 | [`tomato-canopy-extinction-coefficient.md`](./tomato-canopy-extinction-coefficient.md) | `CANOPY_LIGHT_EXTINCTION_COEFF` |
 | [`tomato-transpiration-latent-heat-fraction.md`](./tomato-transpiration-latent-heat-fraction.md) | `TRANSPIRATION_ENERGY_FRACTION` |
+| [`tomato-vpd-optimal-range.md`](./tomato-vpd-optimal-range.md) | `VPD_MIN_KPA`, `VPD_OPT_KPA`, `VPD_MAX_KPA` |
+| [`greenhouse-condensation-dewpoint-physics.md`](./greenhouse-condensation-dewpoint-physics.md) | condensation mechanism in `twin/climate_model.py` |
 
 See [`docs/assumptions/sources.xlsx`](../docs/assumptions/sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

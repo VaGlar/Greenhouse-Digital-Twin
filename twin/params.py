@@ -90,6 +90,18 @@ class ClimateControlParams:
     # night. Real product spec (Ludvig Svensson-style PH55, 55% shading/55% energy saving) from
     # a real vendor quote for this greenhouse. See papers/geothermiki-s192g-quote.md.
     screen_energy_saving_fraction: float = 0.55
+    # PLACEHOLDER: cover surface temperature as a fraction of the way from outdoor to indoor air
+    # temperature -- a thin PE film has little thermal resistance of its own compared to the air
+    # boundary layers on each side, so its surface sits closer to outdoor temperature than indoor.
+    # Not individually sourced; see docs/assumptions/climate-control.md.
+    cover_surface_temp_fraction: float = 0.3
+    # PLACEHOLDER: effective relaxation rate (1/hour) at which bulk air moisture is pulled toward
+    # what the cold cover surface allows, once condensation conditions are met. Engineering
+    # approximation, not a measured mass-transfer coefficient.
+    condensation_rate_constant: float = 2.0
+    # SOURCED: RH ceiling the (idealized) active dehumidification system targets -- commonly cited
+    # target for greenhouse tomato to limit disease pressure. See docs/assumptions/climate-control.md.
+    dehumidification_setpoint_pct: float = 85.0
 
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
@@ -98,6 +110,12 @@ class ClimateControlParams:
             raise ValueError("vent_max_ach must be >= vent_min_ach")
         if self.effective_heat_capacity_j_m2k <= 0:
             raise ValueError("effective_heat_capacity_j_m2k must be > 0")
+        if not 0 <= self.cover_surface_temp_fraction <= 1:
+            raise ValueError("cover_surface_temp_fraction must be in [0, 1]")
+        if self.condensation_rate_constant < 0:
+            raise ValueError("condensation_rate_constant must be >= 0")
+        if not 0 < self.dehumidification_setpoint_pct <= 100:
+            raise ValueError("dehumidification_setpoint_pct must be in (0, 100]")
         if not 0 <= self.screen_energy_saving_fraction < 1:
             raise ValueError("screen_energy_saving_fraction must be in [0, 1)")
 

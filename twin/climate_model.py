@@ -45,11 +45,24 @@ def _saturation_vapor_pressure_kpa(temp_c: float) -> float:
     return 0.6108 * math.exp(17.27 * temp_c / (temp_c + 237.3))
 
 
+def _dew_point_c(vapor_pressure_kpa: float) -> float:
+    """Inverse of the Tetens formula -- the temperature at which the given vapor
+    pressure would be saturating. Standard meteorological formula, not an assumption."""
+    vapor_pressure_kpa = max(vapor_pressure_kpa, 1e-6)
+    ln_term = math.log(vapor_pressure_kpa / 0.6108)
+    return 237.3 * ln_term / (17.27 - ln_term)
+
+
 @dataclass
 class ClimateState:
     temp_in_c: float
     co2_in_ppm: float
     vapor_pressure_kpa: float = 1.0  # ~65% RH at 20C; overwritten by the first step anyway
+
+    @property
+    def vpd_kpa(self) -> float:
+        """Vapor pressure deficit -- fed to the crop model's stomatal/photosynthesis response."""
+        return _saturation_vapor_pressure_kpa(self.temp_in_c) - self.vapor_pressure_kpa
 
 
 @dataclass
@@ -62,6 +75,8 @@ class ClimateStepResult:
     co2_dumped_kg: float
     rh_in_pct: float
     vpd_kpa: float
+    condensed_kg: float
+    dehumidified_kg: float
 
 
 class GreenhouseClimateModel:
@@ -150,8 +165,39 @@ class GreenhouseClimateModel:
         temp_in_kelvin = temp_new + 273.15
         delta_vapor_kpa = moles_water * GAS_CONSTANT_J_MOL_K * temp_in_kelvin / self.geometry.volume_m3 / 1000.0
 
+        vapor_before_condensation = vapor_after_vent + delta_vapor_kpa
+
+        # --- Passive condensation on the (colder) cover surface: real dehumidification
+        # even when the bulk air is well below 100% RH, since the cover surface can sit
+        # below the air's dew point. Cover surface temp approximated as a fixed fraction
+        # of the way from outdoor to indoor air temp (thin-film cover, most thermal
+        # resistance is in the air boundary layers, not the plastic itself).
+        cover_temp_c = temp_out_c + (temp_new - temp_out_c) * self.control.cover_surface_temp_fraction
+        dew_point_c = _dew_point_c(vapor_before_condensation)
+        if cover_temp_c < dew_point_c:
+            cover_saturation_kpa = _saturation_vapor_pressure_kpa(cover_temp_c)
+            vapor_after_condensation = cover_saturation_kpa + (
+                vapor_before_condensation - cover_saturation_kpa
+            ) * math.exp(-self.control.condensation_rate_constant * dt_hours)
+        else:
+            vapor_after_condensation = vapor_before_condensation
+        condensed_kg = max(0.0, vapor_before_condensation - vapor_after_condensation) * 1000.0 / (
+            GAS_CONSTANT_J_MOL_K * temp_in_kelvin
+        ) * self.geometry.volume_m3 * WATER_MOLAR_MASS_G_MOL / 1000.0
+
+        # --- Active dehumidification: idealized setpoint controller (representing the
+        # OptiClima cooling/dehumidification panels) -- brings RH down to its target
+        # ceiling. Capacity is NOT modeled (no real spec available for this system);
+        # treated as always sufficient to reach the setpoint. Replace with a real
+        # capacity limit once the vendor's dehumidification unit spec is known.
         saturation_kpa = _saturation_vapor_pressure_kpa(temp_new)
-        vapor_new = min(vapor_after_vent + delta_vapor_kpa, saturation_kpa)  # cap at 100% RH, no condensation modeled
+        dehum_target_kpa = saturation_kpa * self.control.dehumidification_setpoint_pct / 100.0
+        vapor_after_dehum = min(vapor_after_condensation, dehum_target_kpa)
+        dehumidified_kg = max(0.0, vapor_after_condensation - vapor_after_dehum) * 1000.0 / (
+            GAS_CONSTANT_J_MOL_K * temp_in_kelvin
+        ) * self.geometry.volume_m3 * WATER_MOLAR_MASS_G_MOL / 1000.0
+
+        vapor_new = min(vapor_after_dehum, saturation_kpa)  # final safety cap at 100% RH
 
         rh_in_pct = vapor_new / saturation_kpa * 100.0
         vpd_kpa = saturation_kpa - vapor_new
@@ -165,4 +211,6 @@ class GreenhouseClimateModel:
             co2_dumped_kg=co2_dumped_kg,
             rh_in_pct=rh_in_pct,
             vpd_kpa=vpd_kpa,
+            condensed_kg=condensed_kg,
+            dehumidified_kg=dehumidified_kg,
         )
