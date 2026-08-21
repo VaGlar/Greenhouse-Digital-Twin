@@ -5,12 +5,18 @@
 name: "Παράδειγμα θερμοκηπίου τομάτας 5 στρεμμάτων"
 
 geometry:
-  area_m2: 5000                  # site-specific design figure ("5 στρέμματα") — confirm vs. final survey
-  height_m: 5.5                  # PLACEHOLDER, not individually sourced — see docs/assumptions/geometry-and-chp.md
-  cover_u_value_w_m2k: 6.0       # SOURCED: greenhouse single-glass U-value ~6.5 W/m2K (Greenhouse Management,
-                                  # "Determining greenhouse heat loss", greenhousemag.com — web article, no page)
-  cover_transmissivity: 0.7      # PLACEHOLDER, textbook range 70-90%, conservative end — not individually sourced
-  cover_area_factor: 1.3         # PLACEHOLDER, geometric estimate — depends on real structure, not literature
+  area_m2: 5000                  # site-specific design figure ("5 στρέμματα") — kept at 5000 by user decision,
+                                  # distinct from the real quote's own conflicting 5280/6393 m2 figures (see below)
+  height_m: 5.67                 # SOURCED: derived average height for a Gothic-arch bay, real quote geometry
+                                  # (Geothermiki S192G, 5-bay x 9.6m, side 4.0m, ridge 6.5m) — avg = side + rise*(2/3)
+                                  # for a circular-arc roof; see papers/geothermiki-s192g-quote.md
+  cover_u_value_w_m2k: 4.4       # SOURCED: real cover material is double-inflated PE (not single glass) — U-value
+                                  # for double-layer inflated PE with air gap; papers/tunnelvisionhoops-double-layer.md
+                                  # (caveat: that source's PE is 1mm thick vs. our film's 180 micron — best figure found)
+  cover_transmissivity: 0.90     # SOURCED: 180-micron thermal/anti-drip greenhouse film, 88-92% PAR transmission
+                                  # (matches the real quote's cover spec); papers/greenhouse-film-180micron-transmission.md
+  cover_area_factor: 1.45        # SOURCED: computed from real arch geometry (5 bays x 9.6m chord, 2.5m rise, 100m
+                                  # length, 4.0m side walls) — see docs/assumptions/geometry-and-chp.md for the derivation
 
 chp:
   electric_power_kw: 1000        # FIXED electrical output (grid-driven, not greenhouse-driven) — site-specific 1MW spec
@@ -30,6 +36,8 @@ climate_control:
   co2_setpoint_day_ppm: 900.0      # SOURCED: within cited optimal CO2 enrichment range 700-1000ppm, same review source
   co2_ambient_ppm: 420.0           # SOURCED, factual: current global atmospheric CO2 (~420-425ppm, NOAA/Mauna Loa)
   effective_heat_capacity_j_m2k: 40000.0  # PLACEHOLDER: lumped single-zone thermal mass estimate, not measured
+  screen_energy_saving_fraction: 0.55  # SOURCED: real thermal screen spec (type PH55), deployed at night
+                                         # (papers/geothermiki-s192g-quote.md — 55% shading / 55% energy saving)
 
 crop:
   variety: "Beefsteak tomato"      # site-specific placeholder

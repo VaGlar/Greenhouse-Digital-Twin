@@ -30,3 +30,30 @@
 ## Bottom line
 
 The **structure** of the crop model (light/CO2/temperature response curves feeding canopy photosynthesis, minus maintenance respiration, partitioned to fruit by growth stage) is a legitimate simplified version of how real crop models like TOMGRO work. Most of the **numbers** are literature-plausible but not individually calibrated to this greenhouse. Two values (`fruit_partition_fraction_max`, `T_OPT_C`) were found to be conservative relative to the literature and were raised on 2026-08-19 — see the rows above for before/after and the resulting baseline yield change (13.30 → 20.25 kg/m² over a 150-day run).
+
+## Bug fix: nighttime respiration was a no-op (2026-08-20)
+
+Not a numeric assumption — a logic bug in `twin/crop_model.py`. The standing-biomass update used
+`new_standing_dm = max(current, current + net_dry_matter_g_m2_hour)`, intended (per its comment)
+to prevent biomass from shrinking since senescence/leaf drop isn't modeled. In practice this
+clamp discarded **every** hour's net change whenever it was negative — which is every night,
+since `gross_assimilation` requires light. Maintenance respiration was therefore silently a no-op
+at night, every night, for the whole simulation.
+
+This was found while adding the thermal screen (`climate_control.screen_energy_saving_fraction`):
+the screen only acts at night, and its effect on temperature turned out to have **zero** measurable
+effect on final yield — traced to this clamp discarding the very hours the screen changes.
+
+Fixed by flooring standing biomass at 0 instead of at its previous value:
+`new_standing_dm = max(0.0, current + net_dry_matter_g_m2_hour)`. This lets respiration properly
+reduce biomass overnight (real physiology), while still preventing an unphysical negative value.
+Senescence/leaf abscission (programmed tissue death) remains genuinely unmodeled — a separate,
+still-open gap — but respiration is no longer conflated with it.
+
+Effect: since biomass no longer over-accumulates by skipping nightly respiration, the following
+day's respiration cost (which scales with standing biomass) is correspondingly lower, and net
+growth available for fruit partitioning is higher. Baseline 150-day yield moved from 20.25 to
+**20.96 kg/m²** (fixed respiration alone, screen at its default 0.55 fraction); the thermal
+screen's own marginal contribution is small but now non-zero (~20.96 vs ~20.957 kg/m² with the
+screen fraction forced to 0 — see `tests/test_crop_model.py` for a unit-level regression check
+should this clamp regress).

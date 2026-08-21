@@ -20,6 +20,14 @@ This folder is the audit trail for every non-obvious number in `config/greenhous
 
 New assumptions get the same treatment at the point they're introduced: a short comment in the code/config citing where the number comes from (source + page/section if it has one, or "engineering estimate — no single source" if it doesn't), and an entry in the relevant file here. This audit is meant to stay current, not be a one-time snapshot — if a value here gets changed later, update both the code comment and this doc in the same commit.
 
+## Known open gaps (not yet modeled)
+
+Distinct from the tables above — these are things the model doesn't attempt to represent at all yet, tracked here so they don't get lost:
+
+- **Senescence / leaf abscission** (`twin/crop_model.py`) — real plants shed old leaves/tissue as they age (permanent biomass loss), on top of the day-to-day respiration the model does track (fixed 2026-08-20, see `crop-model.md`). Not modeled — would matter most for long crop cycles (many months) where accumulated leaf drop becomes significant. No target date; revisit if long-cycle runs start looking unrealistically leafy/heavy late in the cycle.
+- **Latitude-driven day length** (`twin/weather.py`) — `weather.latitude_deg` is stored but unused; the synthetic weather generator uses flat calendar-day/hour sinusoids instead of real sun-angle geometry. See `weather.md`.
+- **Fixed day/night clock window** (`climate_control.day_start_hour/day_end_hour`) — a flat 6am-8pm boundary, not tied to actual sunrise/sunset for the real site/season. See `climate-control.md`.
+
 ## Research method note
 
 Sources were located via web search on 2026-08-19 and are consumer-web references (research papers, university extension publications, industry sites), not a systematic literature review. Where a range was found rather than a single number, the config value is checked against that range, not against one paper's specific result. Treat "SOURCED" as *"checked against publicly available literature and found plausible,"* not as *"this specific greenhouse was measured and this is its true value."* Real calibration still requires this greenhouse's own sensor and yield data once it exists.
