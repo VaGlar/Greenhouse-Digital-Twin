@@ -99,9 +99,11 @@ class ClimateControlParams:
     # what the cold cover surface allows, once condensation conditions are met. Engineering
     # approximation, not a measured mass-transfer coefficient.
     condensation_rate_constant: float = 2.0
-    # SOURCED: RH ceiling the (idealized) active dehumidification system targets -- commonly cited
-    # target for greenhouse tomato to limit disease pressure. See docs/assumptions/climate-control.md.
-    dehumidification_setpoint_pct: float = 85.0
+    # SOURCED: RH ceiling the (idealized) active dehumidification system targets. Literature range
+    # for greenhouse tomato is 60-85% (day 80-85%, night 65-75%), but 70% is specifically cited as
+    # the optimum for pollination (>80% pollen clumps together; <60% stigma dries out) -- used as
+    # the single setpoint. See docs/assumptions/climate-control.md.
+    dehumidification_setpoint_pct: float = 70.0
 
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
