@@ -4,7 +4,6 @@ import {
   Legend,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -327,6 +326,10 @@ function App() {
 
           <section className="chart-card">
             <h2>Θερμική κατανάλωση (μέση ισχύς/ώρα)</h2>
+            <p className="chart-card-subtitle">
+              Μέγιστη ισχύς CHP: {result.summary.max_heat_available_kw.toLocaleString()} kW — η κατανάλωση δεν
+              μπορεί ποτέ να την ξεπεράσει.
+            </p>
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="var(--gridline)" vertical={false} />
@@ -334,12 +337,6 @@ function App() {
                 <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" kW" width={56} />
                 <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
                 <Legend />
-                <ReferenceLine
-                  y={result.summary.max_heat_available_kw}
-                  stroke="var(--amber)"
-                  strokeDasharray="5 4"
-                  label={{ value: "Μέγιστη ισχύς CHP", position: "insideTopRight", fill: "var(--amber)", fontSize: 11 }}
-                />
                 <Line type="monotone" dataKey="heat_used_kw" name="Μέση ισχύς" stroke="var(--energy)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>

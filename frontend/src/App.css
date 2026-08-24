@@ -234,6 +234,13 @@
   color: var(--text-secondary);
 }
 
+.chart-card-subtitle {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: -4px 0 10px;
+  line-height: 1.4;
+}
+
 /* ── Simulation params form ── */
 .form-card {
   background: var(--surface-1);
