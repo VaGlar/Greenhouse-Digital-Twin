@@ -62,8 +62,6 @@ class SimulateRequest(BaseModel):
     heating_setpoint_day_c: float | None = None
     heating_setpoint_night_c: float | None = None
     co2_setpoint_day_ppm: float | None = None
-    screen_open_hour: int | None = None
-    screen_close_hour: int | None = None
     dehumidification_setpoint_pct: float | None = None
 
 
@@ -84,10 +82,6 @@ def _apply_overrides(raw: dict, overrides: SimulateRequest) -> dict:
         climate["heating_setpoint_night_c"] = overrides.heating_setpoint_night_c
     if overrides.co2_setpoint_day_ppm is not None:
         climate["co2_setpoint_day_ppm"] = overrides.co2_setpoint_day_ppm
-    if overrides.screen_open_hour is not None:
-        climate["screen_open_hour"] = overrides.screen_open_hour
-    if overrides.screen_close_hour is not None:
-        climate["screen_close_hour"] = overrides.screen_close_hour
     if overrides.dehumidification_setpoint_pct is not None:
         climate["dehumidification_setpoint_pct"] = overrides.dehumidification_setpoint_pct
     return raw
@@ -115,10 +109,13 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 # Daily-average power draw (kW), i.e. normalized per hour — not a daily total —
                 # so it's directly comparable to the CHP's fixed max heat output below.
                 "heat_used_kw": "mean",
+                "screen_deployed": "sum",  # hours deployed that day (timestep is hourly)
             }
         )
         .reset_index()
+        .rename(columns={"screen_deployed": "screen_closed_hours"})
     )
+    daily["screen_closed_hours"] = daily["screen_closed_hours"] * params.simulation.timestep_hours
 
     final_yield_kg_m2 = float(results["fruit_fresh_yield_kg_m2"].iloc[-1])
     # heat_used_kw is an hourly instantaneous rate; sum(kW readings) * timestep_hours gives the
@@ -126,6 +123,8 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
     # every hour (twin/climate_model.py: heat_used_w = min(required_w, heat_available_w)), so it
     # can never exceed max_heat_available_kw * duration_hours.
     total_heat_used_kwh = float(results["heat_used_kw"].sum() * params.simulation.timestep_hours)
+    heat_loss_avoided_kwh = float(results["heat_loss_avoided_kw"].sum() * params.simulation.timestep_hours)
+    screen_deployed_pct = float(results["screen_deployed"].mean() * 100.0)
 
     return {
         "greenhouse_name": params.name,
@@ -136,6 +135,8 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "duration_days": params.simulation.duration_days,
             "total_heat_used_kwh": total_heat_used_kwh,
             "max_heat_available_kw": params.chp.heat_available_kw,
+            "heat_loss_avoided_kwh": heat_loss_avoided_kwh,
+            "screen_deployed_pct": screen_deployed_pct,
         },
         "daily_series": [
             {
@@ -147,6 +148,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "vpd_kpa": round(row.vpd_kpa, 3),
                 "fruit_fresh_yield_kg_m2": round(row.fruit_fresh_yield_kg_m2, 3),
                 "heat_used_kw": round(row.heat_used_kw, 1),
+                "screen_closed_hours": round(row.screen_closed_hours, 1),
             }
             for row in daily.itertuples()
         ],

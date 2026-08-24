@@ -20,7 +20,7 @@ Since the climate model simulates one shared air volume, "zones" map to the mode
 | # | Zone | Schematic element | Live pins | Panel section (existing groups it maps to) |
 |---|---|---|---|---|
 | 1 | Cover & structure | Roof/wall arch | Outdoor temp, solar radiation | Κλίμα (structural/cover-related sliders) |
-| 2 | Thermal screen | Horizontal line inside arch | Fixed energy-saving % (product spec, not adjustable), deployment schedule | Υγρασία (`day_start_hour`/`day_end_hour`) |
+| 2 | Thermal screen | Horizontal line inside arch | Fixed energy-saving % (product spec, not adjustable), live season % of time deployed | none — fully automatic since 2026-08-24, see `docs/plans/2026-08-24-automatic-thermal-screen-design.md` |
 | 3 | Air / climate | Canopy-level pin | Indoor temp, RH, VPD, CO2 | Κλίμα, Υγρασία |
 | 4 | Crop / canopy | Stylized plant row along gutter line | LAI, yield-to-date | Καλλιέργεια |
 | 5 | Vents & dehumidification | Roof vent symbols | Vent state, condensation/dehumidification rate | Υγρασία (`dehumidification_setpoint_pct`) |

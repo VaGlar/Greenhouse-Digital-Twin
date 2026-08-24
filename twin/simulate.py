@@ -33,11 +33,20 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
     for _, row in weather_df.iterrows():
         hour = row["timestamp"].hour
 
+        # Decided once per hour and fed to both models, so the crop's shaded light and the
+        # climate model's energy balance always agree on whether the screen is deployed.
+        screen_deployed = climate_model.decide_screen_deployment(
+            climate_state, hour=hour, temp_out_c=row["temp_out_c"], solar_rad_w_m2=row["solar_rad_w_m2"], dt_hours=dt_hours
+        )
+        shaded_solar_rad_w_m2 = row["solar_rad_w_m2"] * (
+            1.0 - params.climate_control.screen_energy_saving_fraction if screen_deployed else 1.0
+        )
+
         crop_result = crop_model.step(
             crop_state,
             temp_in_c=climate_state.temp_in_c,
             co2_in_ppm=climate_state.co2_in_ppm,
-            solar_rad_w_m2=row["solar_rad_w_m2"],
+            solar_rad_w_m2=shaded_solar_rad_w_m2,
             dt_hours=dt_hours,
             vpd_kpa=climate_state.vpd_kpa,
         )
@@ -53,6 +62,7 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
             co2_uptake_kg_per_hour=co2_uptake_kg_per_hour,
             rh_out_pct=row["rh_out_pct"],
             transpiration_kg_per_hour=transpiration_kg_per_hour,
+            screen_deployed=screen_deployed,
         )
 
         climate_state = climate_result.state
@@ -67,6 +77,8 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
                 "co2_in_ppm": climate_state.co2_in_ppm,
                 "heat_used_kw": climate_result.heat_used_kw,
                 "heat_dumped_kw": climate_result.heat_dumped_kw,
+                "screen_deployed": climate_result.screen_deployed,
+                "heat_loss_avoided_kw": climate_result.heat_loss_avoided_kw,
                 "vent_ach": climate_result.vent_ach,
                 "co2_injected_kg": climate_result.co2_injected_kg,
                 "co2_dumped_kg": climate_result.co2_dumped_kg,

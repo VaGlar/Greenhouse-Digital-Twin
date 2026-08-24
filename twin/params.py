@@ -86,18 +86,19 @@ class ClimateControlParams:
     co2_setpoint_day_ppm: float = 900.0
     co2_ambient_ppm: float = 420.0
     effective_heat_capacity_j_m2k: float = 40_000.0  # lumped thermal mass per m2 floor area
-    # SOURCED: fraction of transmission heat loss cut when the thermal screen is deployed at
-    # night. Real product spec (Ludvig Svensson-style PH55, 55% shading/55% energy saving) from
-    # a real vendor quote for this greenhouse. See papers/geothermiki-s192g-quote.md.
+    # SOURCED: fraction cut from BOTH transmission heat loss and solar gain when the thermal
+    # screen is deployed -- real product spec (Ludvig Svensson-style PH55, "55% shading, ~55%
+    # energy saving") from a real vendor quote for this greenhouse: same fabric, same ~55% figure
+    # for both effects. See papers/geothermiki-s192g-quote.md. Deployment itself is fully
+    # automatic (twin/climate_model.py: GreenhouseClimateModel._screen_should_deploy) -- not a
+    # user-adjustable schedule; see climate-control.md for the 3-criteria control logic.
     screen_energy_saving_fraction: float = 0.55
-    # PLACEHOLDER: when the thermal screen deploys/retracts. Deliberately a SEPARATE clock window
-    # from day_start_hour/day_end_hour (which only gate the heating setpoint and CO2 dosing) --
-    # they default to the same hours but must stay independent, otherwise widening the screen's
-    # "open" window also silently keeps the daytime heating setpoint and CO2 dosing active for
-    # more hours, inflating yield for reasons that have nothing to do with the screen itself
-    # (found 2026-08-24 when "never closing" the screen raised yield). See climate-control.md.
-    screen_open_hour: int = 6
-    screen_close_hour: int = 20
+    # PLACEHOLDER: safety margin for the screen's "CHP can't keep up" trigger -- deploys (if net
+    # beneficial once its solar-blocking cost is weighed in) once required heating power exceeds
+    # this fraction of the CHP's fixed heat output, rather than waiting for 100% (which would
+    # mean the setpoint is already being missed before the screen even reacts). An engineering
+    # safety-margin choice, not from a specific literature source. See climate-control.md.
+    chp_heat_margin_fraction: float = 0.9
     # PLACEHOLDER: cover surface temperature as a fraction of the way from outdoor to indoor air
     # temperature -- a thin PE film has little thermal resistance of its own compared to the air
     # boundary layers on each side, so its surface sits closer to outdoor temperature than indoor.
@@ -116,8 +117,8 @@ class ClimateControlParams:
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
             raise ValueError("day_start_hour/day_end_hour must be within [0, 24]")
-        if not 0 <= self.screen_open_hour < 24 or not 0 <= self.screen_close_hour <= 24:
-            raise ValueError("screen_open_hour/screen_close_hour must be within [0, 24]")
+        if not 0 < self.chp_heat_margin_fraction <= 1:
+            raise ValueError("chp_heat_margin_fraction must be in (0, 1]")
         if self.vent_max_ach < self.vent_min_ach:
             raise ValueError("vent_max_ach must be >= vent_min_ach")
         if self.effective_heat_capacity_j_m2k <= 0:
@@ -133,9 +134,6 @@ class ClimateControlParams:
 
     def is_daytime(self, hour: int) -> bool:
         return self.day_start_hour <= hour < self.day_end_hour
-
-    def is_screen_deployed(self, hour: int) -> bool:
-        return not (self.screen_open_hour <= hour < self.screen_close_hour)
 
     def heating_setpoint(self, hour: int) -> float:
         return self.heating_setpoint_day_c if self.is_daytime(hour) else self.heating_setpoint_night_c

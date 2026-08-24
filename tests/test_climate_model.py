@@ -90,6 +90,54 @@ def test_cold_cover_condenses_moisture_out_of_humid_air():
     assert result.condensed_kg > 0.0
 
 
+def test_screen_deploys_at_night_regardless_of_conditions():
+    geometry = _geometry()
+    control = _control()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    state = ClimateState(temp_in_c=17.0, co2_in_ppm=420.0)
+    # hour=2 is night (default day window 6-20); mild conditions, no other trigger would fire
+    assert model.decide_screen_deployment(state, hour=2, temp_out_c=10.0, solar_rad_w_m2=0.0, dt_hours=1.0) is True
+
+
+def test_screen_deploys_for_shading_when_ventilation_alone_would_not_be_enough():
+    geometry = _geometry()
+    control = _control()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    # scorching midday sun, already-hot indoor air -- even max ventilation can't hold this
+    state = ClimateState(temp_in_c=30.0, co2_in_ppm=420.0)
+    assert model.decide_screen_deployment(state, hour=13, temp_out_c=35.0, solar_rad_w_m2=900.0, dt_hours=1.0) is True
+
+
+def test_screen_deploys_for_cold_when_chp_insufficient_and_no_sun_to_lose():
+    geometry = _geometry()
+    control = _control()
+    # weak CHP -- easily overwhelmed by a cold night/overcast day
+    weak_chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=0.05, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, weak_chp, control)
+
+    # daytime hour so this exercises the cold-trigger branch specifically (not the night one),
+    # but overcast (no solar) -- insulating has nothing but upside here
+    state = ClimateState(temp_in_c=5.0, co2_in_ppm=420.0)
+    assert model.decide_screen_deployment(state, hour=13, temp_out_c=-10.0, solar_rad_w_m2=0.0, dt_hours=1.0) is True
+
+
+def test_screen_stays_retracted_when_cold_but_sun_outweighs_insulation_benefit():
+    geometry = _geometry()
+    control = _control()
+    # same weak CHP as above -- still can't keep up with the cold on its own
+    weak_chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=0.05, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, weak_chp, control)
+
+    # cold outside, but real winter sun -- the screen would block more free solar heat than
+    # its insulation would save, so a real controller (and this one) should leave it open
+    state = ClimateState(temp_in_c=5.0, co2_in_ppm=420.0)
+    assert model.decide_screen_deployment(state, hour=13, temp_out_c=-10.0, solar_rad_w_m2=200.0, dt_hours=1.0) is False
+
+
 def test_active_dehumidification_caps_relative_humidity_at_setpoint():
     geometry = _geometry()
     control = _control()  # dehumidification_setpoint_pct defaults to 85.0

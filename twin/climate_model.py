@@ -12,11 +12,14 @@ output are also fixed. The greenhouse draws what it needs from that fixed
 supply; the rest is dumped (excess heat) or vented (excess CO2) — the CHP
 itself is never modulated based on greenhouse demand.
 
-Thermal screen: deployed on its own schedule (screen_open_hour/screen_close_hour,
-defaults to night only), cutting transmission heat loss by a fixed fraction.
-Modeled as a simple open/closed toggle, not a continuous deploy/retract
-control loop. Deliberately a separate schedule from day_start_hour/day_end_hour
-(which gate the heating setpoint and CO2 dosing) -- see ClimateControlParams.
+Thermal screen: fully automatic, deployed whenever any of three conditions
+hold (see _screen_should_deploy): night, projected overheating (shade helps
+unconditionally), or a cold hour where the CHP can't keep up AND deploying
+would net-help (the screen cuts transmission loss but -- being the same
+"55% shading / 55% energy saving" fabric per the vendor quote -- also cuts
+solar gain, so on a cold-but-sunny hour closing it can lose more heat than
+it saves; a real controller wouldn't do that, so neither does this one).
+Modeled as a simple deployed/retracted toggle, not a continuous position.
 
 Humidity: tracked as vapor pressure (kPa), the same way real greenhouse
 models do (rather than tracking relative humidity directly, which is
@@ -39,6 +42,11 @@ AIR_VOLUMETRIC_HEAT_CAPACITY_J_M3K = 1_200.0  # ~ air density (1.2 kg/m3) x spec
 CO2_DENSITY_KG_M3 = 1.83  # density of CO2 gas at ~20C, used only to convert mass <-> ppm
 WATER_MOLAR_MASS_G_MOL = 18.02  # physical constant
 GAS_CONSTANT_J_MOL_K = 8.314  # physical constant (ideal gas law)
+# PLACEHOLDER: degrees above vent_setpoint over which ventilation ramps from vent_min_ach to
+# vent_max_ach. Also used as the "too hot" screen-shading threshold (vent_setpoint +
+# VENT_RAMP_BAND_C = the point ventilation is already fully ramped) -- shared so the two stay
+# consistent by construction.
+VENT_RAMP_BAND_C = 5.0
 
 
 def _saturation_vapor_pressure_kpa(temp_c: float) -> float:
@@ -79,6 +87,11 @@ class ClimateStepResult:
     vpd_kpa: float
     condensed_kg: float
     dehumidified_kg: float
+    screen_deployed: bool
+    # Transmission-loss reduction actually realized this hour because the screen was
+    # deployed (0 if retracted) -- a direct physical quantity, not a counterfactual
+    # second simulation. Used to report "energy saved by the screen" to the user.
+    heat_loss_avoided_kw: float
 
 
 class GreenhouseClimateModel:
@@ -87,6 +100,52 @@ class GreenhouseClimateModel:
         self.chp = chp
         self.control = control
         self._thermal_capacity_j_k = control.effective_heat_capacity_j_m2k * geometry.area_m2
+
+    def decide_screen_deployment(
+        self,
+        state: ClimateState,
+        hour: int,
+        temp_out_c: float,
+        solar_rad_w_m2: float,
+        dt_hours: float,
+    ) -> bool:
+        """Decide deploy/retract for this hour, before the screen's own effect is applied to
+        the energy balance -- see module docstring for the 3 criteria. Public so twin/simulate.py
+        can compute this once per hour and feed the same decision to both this model (energy
+        balance) and the crop model (shaded light for photosynthesis), keeping them consistent."""
+        if not self.control.is_daytime(hour):
+            return True  # night
+
+        dt_s = dt_hours * 3600.0
+        c_total = self._thermal_capacity_j_k
+        setpoint = self.control.heating_setpoint(hour)
+        vent_setpoint = setpoint + self.control.vent_temp_margin_c
+        q_solar_w_full = solar_rad_w_m2 * self.geometry.area_m2 * self.geometry.cover_transmissivity
+        q_trans_loss_w_full = self.geometry.cover_u_value_w_m2k * self.geometry.cover_area_m2 * (
+            state.temp_in_c - temp_out_c
+        )
+
+        # "Too hot" means ventilation alone (even fully ramped) won't be enough -- not merely
+        # "ventilation has started ramping up", which is its normal job and handles the vast
+        # majority of solar load on its own (confirmed: with no screen at all, actual indoor
+        # temp never exceeded ~25C across a 150-day run even though ventilation ramps starting
+        # right at vent_setpoint). Using vent_setpoint alone made the screen shade ~59% of all
+        # daytime hours and cut yield ~17% for no real overheating benefit -- see
+        # docs/assumptions/climate-control.md.
+        temp_pred_no_screen = state.temp_in_c + (q_solar_w_full - q_trans_loss_w_full) * dt_s / c_total
+        if temp_pred_no_screen > vent_setpoint + VENT_RAMP_BAND_C:
+            return True  # projected overheating even at max ventilation -- shading only helps here
+
+        heat_available_w = self.chp.heat_available_kw * 1000.0
+        required_w_no_screen = max(0.0, (setpoint - temp_pred_no_screen) * c_total / dt_s)
+        if required_w_no_screen <= self.control.chp_heat_margin_fraction * heat_available_w:
+            return False  # CHP has enough headroom, no need to insulate at the cost of light
+
+        # Cold and CHP can't comfortably keep up -- but the screen also blocks solar
+        # gain, so only close it if that trade actually reduces the heat deficit.
+        trans_loss_saved_w = max(0.0, q_trans_loss_w_full) * self.control.screen_energy_saving_fraction
+        solar_lost_w = max(0.0, q_solar_w_full) * self.control.screen_energy_saving_fraction
+        return trans_loss_saved_w > solar_lost_w
 
     def step(
         self,
@@ -98,23 +157,33 @@ class GreenhouseClimateModel:
         co2_uptake_kg_per_hour: float = 0.0,
         rh_out_pct: float = 60.0,
         transpiration_kg_per_hour: float = 0.0,
+        screen_deployed: bool | None = None,
     ) -> ClimateStepResult:
         dt_s = dt_hours * 3600.0
         c_total = self._thermal_capacity_j_k
 
         # --- Energy balance: solar gain vs. transmission loss ---
-        q_solar_w = solar_rad_w_m2 * self.geometry.area_m2 * self.geometry.cover_transmissivity
-        q_trans_loss_w = self.geometry.cover_u_value_w_m2k * self.geometry.cover_area_m2 * (state.temp_in_c - temp_out_c)
-        # Thermal screen: deployed on its own schedule (screen_open_hour/screen_close_hour),
-        # independent of the heating/CO2 day-night window -- cuts transmission heat loss by its
-        # rated energy-saving fraction while deployed.
-        if self.control.is_screen_deployed(hour):
-            q_trans_loss_w *= 1.0 - self.control.screen_energy_saving_fraction
+        setpoint = self.control.heating_setpoint(hour)
+        vent_setpoint = setpoint + self.control.vent_temp_margin_c
+        q_solar_w_full = solar_rad_w_m2 * self.geometry.area_m2 * self.geometry.cover_transmissivity
+        q_trans_loss_w_full = self.geometry.cover_u_value_w_m2k * self.geometry.cover_area_m2 * (
+            state.temp_in_c - temp_out_c
+        )
+        if screen_deployed is None:
+            screen_deployed = self.decide_screen_deployment(state, hour, temp_out_c, solar_rad_w_m2, dt_hours)
+        # Thermal screen: same fabric provides both effects whenever deployed -- cuts
+        # transmission heat loss AND solar gain by its rated fraction (see module docstring).
+        if screen_deployed:
+            q_solar_w = q_solar_w_full * (1.0 - self.control.screen_energy_saving_fraction)
+            q_trans_loss_w = q_trans_loss_w_full * (1.0 - self.control.screen_energy_saving_fraction)
+        else:
+            q_solar_w = q_solar_w_full
+            q_trans_loss_w = q_trans_loss_w_full
+        heat_loss_avoided_kw = max(0.0, q_trans_loss_w_full - q_trans_loss_w) / 1000.0
         net_w = q_solar_w - q_trans_loss_w
         temp_pred = state.temp_in_c + net_w * dt_s / c_total
 
         # --- Heating from the CHP's fixed, constant heat supply ---
-        setpoint = self.control.heating_setpoint(hour)
         heat_available_w = self.chp.heat_available_kw * 1000.0
         if temp_pred < setpoint:
             required_w = (setpoint - temp_pred) * c_total / dt_s
@@ -126,10 +195,8 @@ class GreenhouseClimateModel:
         heat_dumped_kw = self.chp.heat_available_kw - heat_used_kw
 
         # --- Ventilation: ramps up once temperature exceeds setpoint + margin ---
-        vent_setpoint = setpoint + self.control.vent_temp_margin_c
         excess = max(0.0, temp_after_heat - vent_setpoint)
-        ramp_band_c = 5.0
-        ramp_fraction = min(1.0, excess / ramp_band_c)
+        ramp_fraction = min(1.0, excess / VENT_RAMP_BAND_C)
         ach = self.control.vent_min_ach + (self.control.vent_max_ach - self.control.vent_min_ach) * ramp_fraction
 
         delta_t = temp_after_heat - temp_out_c
@@ -216,4 +283,6 @@ class GreenhouseClimateModel:
             vpd_kpa=vpd_kpa,
             condensed_kg=condensed_kg,
             dehumidified_kg=dehumidified_kg,
+            screen_deployed=screen_deployed,
+            heat_loss_avoided_kw=heat_loss_avoided_kw,
         )

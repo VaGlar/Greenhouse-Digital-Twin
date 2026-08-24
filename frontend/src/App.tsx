@@ -26,8 +26,6 @@ type SliderKey =
   | "heating_setpoint_day_c"
   | "heating_setpoint_night_c"
   | "co2_setpoint_day_ppm"
-  | "screen_open_hour"
-  | "screen_close_hour"
   | "dehumidification_setpoint_pct"
   | "duration_days";
 
@@ -95,23 +93,6 @@ const SLIDER_GROUPS: SliderGroup[] = [
     zone: "humidity",
     sliders: [
       {
-        key: "screen_open_hour",
-        label: "Ώρα ανοίγματος θερμοκουρτίνας",
-        unit: ":00",
-        min: 0,
-        max: 12,
-        step: 1,
-      },
-      {
-        key: "screen_close_hour",
-        label: "Ώρα κλεισίματος θερμοκουρτίνας",
-        unit: ":00",
-        min: 12,
-        max: 24,
-        step: 1,
-        note: "Ρυθμίζει μόνο πότε κλείνει/ανοίγει η κουρτίνα (σταθερή εξοικονόμηση 55% όσο είναι κλειστή) — δεν επηρεάζει τη θερμοκρασία-στόχο ή τη δοσολογία CO2, που έχουν δικό τους ανεξάρτητο ωράριο.",
-      },
-      {
         key: "dehumidification_setpoint_pct",
         label: "Στόχος αφύγρανσης (RH)",
         unit: "%",
@@ -159,8 +140,6 @@ const DEFAULT_SLIDER_VALUES: Record<SliderKey, number> = {
   heating_setpoint_day_c: 20,
   heating_setpoint_night_c: 17,
   co2_setpoint_day_ppm: 900,
-  screen_open_hour: 6,
-  screen_close_hour: 20,
   dehumidification_setpoint_pct: 70,
   duration_days: 150,
 };
@@ -184,8 +163,6 @@ function App() {
           heating_setpoint_day_c: c.climate_control.heating_setpoint_day_c,
           heating_setpoint_night_c: c.climate_control.heating_setpoint_night_c,
           co2_setpoint_day_ppm: c.climate_control.co2_setpoint_day_ppm,
-          screen_open_hour: c.climate_control.screen_open_hour,
-          screen_close_hour: c.climate_control.screen_close_hour,
           dehumidification_setpoint_pct: c.climate_control.dehumidification_setpoint_pct,
           duration_days: c.simulation.duration_days,
         });
@@ -254,7 +231,7 @@ function App() {
         vpdKpa={latestDay?.vpd_kpa ?? null}
         co2Ppm={latestDay?.co2_in_ppm ?? null}
         screenSavingPct={config ? config.climate_control.screen_energy_saving_fraction * 100 : 55}
-        screenScheduleLabel={`κλειστή ${sliderValues.screen_close_hour}:00–${sliderValues.screen_open_hour}:00`}
+        screenDeployedPct={result?.summary.screen_deployed_pct ?? null}
         dehumidSetpointPct={sliderValues.dehumidification_setpoint_pct}
         yieldKgM2={latestDay?.fruit_fresh_yield_kg_m2 ?? null}
       />
@@ -280,6 +257,15 @@ function App() {
                   onChange={(v) => setSliderValues((prev) => ({ ...prev, [s.key]: v }))}
                 />
               ))}
+              {g.key === "humidity" && (
+                <p className="form-group-info">
+                  ⓘ Η θερμοκουρτίνα λειτουργεί πλήρως αυτόματα — κλείνει τη νύχτα, όταν κάνει
+                  πολλή ζέστη (σκίαση, ακόμα κι αν ο αερισμός φτάσει στο μέγιστό του), ή όταν
+                  κάνει κρύο και η CHP δεν επαρκεί, εφόσον η μόνωση συμφέρει περισσότερο από τον
+                  χαμένο ήλιο. Δεν ρυθμίζεται χειροκίνητα — δες την ένδειξη στο διάγραμμα
+                  παραπάνω και τα γραφήματα κατανάλωσης/ωρών κλειστής κάτω.
+                </p>
+              )}
               {g.key === "crop" && (
                 <div className="form-field">
                   <label htmlFor="crop-variety">Ποικιλία</label>
@@ -320,6 +306,7 @@ function App() {
             <StatTile label="Συνολική παραγωγή" value={`${result.summary.total_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`} />
             <StatTile label="Διάρκεια" value={`${result.summary.duration_days} μέρες`} />
             <StatTile label="Θερμική κατανάλωση" value={`${result.summary.total_heat_used_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`} />
+            <StatTile label="Εξοικονόμηση από κουρτίνα" value={`${result.summary.heat_loss_avoided_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`} />
           </section>
 
           <div className="chart-grid">
@@ -354,6 +341,19 @@ function App() {
                   label={{ value: "Μέγιστη ισχύς CHP", position: "insideTopRight", fill: "var(--amber)", fontSize: 11 }}
                 />
                 <Line type="monotone" dataKey="heat_used_kw" name="Μέση ισχύς" stroke="var(--energy)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </section>
+
+          <section className="chart-card">
+            <h2>Ώρες κλειστής θερμοκουρτίνας/ημέρα</h2>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="var(--gridline)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
+                <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit="h" width={40} domain={[0, 24]} />
+                <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
+                <Line type="monotone" dataKey="screen_closed_hours" name="Κλειστή" stroke="var(--humidity)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </section>

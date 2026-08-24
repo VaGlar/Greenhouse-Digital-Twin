@@ -25,8 +25,6 @@ export interface GreenhouseConfig {
     heating_setpoint_night_c: number;
     co2_setpoint_day_ppm: number;
     screen_energy_saving_fraction: number;
-    screen_open_hour: number;
-    screen_close_hour: number;
     dehumidification_setpoint_pct: number;
     [key: string]: unknown;
   };
@@ -43,6 +41,8 @@ export interface DailyPoint {
   fruit_fresh_yield_kg_m2: number;
   /** Daily-average thermal power draw (kW), normalized per hour — not a daily total. */
   heat_used_kw: number;
+  /** Hours that day the thermal screen was deployed (fully automatic — see backend). */
+  screen_closed_hours: number;
 }
 
 export interface SimulationResult {
@@ -54,6 +54,8 @@ export interface SimulationResult {
     duration_days: number;
     total_heat_used_kwh: number;
     max_heat_available_kw: number;
+    heat_loss_avoided_kwh: number;
+    screen_deployed_pct: number;
   };
   daily_series: DailyPoint[];
 }
@@ -66,8 +68,6 @@ export interface SimulationOverrides {
   heating_setpoint_day_c?: number;
   heating_setpoint_night_c?: number;
   co2_setpoint_day_ppm?: number;
-  screen_open_hour?: number;
-  screen_close_hour?: number;
   dehumidification_setpoint_pct?: number;
 }
 
