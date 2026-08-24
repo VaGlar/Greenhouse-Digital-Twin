@@ -112,12 +112,17 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "rh_in_pct": "mean",
                 "vpd_kpa": "mean",
                 "fruit_fresh_yield_kg_m2": "last",
+                "heat_used_kw": "sum",
             }
         )
         .reset_index()
     )
+    # heat_used_kw is an hourly instantaneous rate; sum(kW readings) * timestep_hours
+    # gives energy (kWh) consumed that day. Renamed to make the unit explicit.
+    daily["heat_used_kwh"] = daily["heat_used_kw"] * params.simulation.timestep_hours
 
     final_yield_kg_m2 = float(results["fruit_fresh_yield_kg_m2"].iloc[-1])
+    total_heat_used_kwh = float(results["heat_used_kw"].sum() * params.simulation.timestep_hours)
 
     return {
         "greenhouse_name": params.name,
@@ -126,6 +131,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "total_yield_kg": final_yield_kg_m2 * params.geometry.area_m2,
             "area_m2": params.geometry.area_m2,
             "duration_days": params.simulation.duration_days,
+            "total_heat_used_kwh": total_heat_used_kwh,
         },
         "daily_series": [
             {
@@ -136,6 +142,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "rh_in_pct": round(row.rh_in_pct, 1),
                 "vpd_kpa": round(row.vpd_kpa, 3),
                 "fruit_fresh_yield_kg_m2": round(row.fruit_fresh_yield_kg_m2, 3),
+                "heat_used_kwh": round(row.heat_used_kwh, 1),
             }
             for row in daily.itertuples()
         ],

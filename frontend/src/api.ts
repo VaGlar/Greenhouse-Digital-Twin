@@ -41,6 +41,7 @@ export interface DailyPoint {
   rh_in_pct: number;
   vpd_kpa: number;
   fruit_fresh_yield_kg_m2: number;
+  heat_used_kwh: number;
 }
 
 export interface SimulationResult {
@@ -50,6 +51,7 @@ export interface SimulationResult {
     total_yield_kg: number;
     area_m2: number;
     duration_days: number;
+    total_heat_used_kwh: number;
   };
   daily_series: DailyPoint[];
 }
