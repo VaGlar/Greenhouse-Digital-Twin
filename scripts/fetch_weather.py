@@ -33,6 +33,8 @@ twin/weather.py's _load_csv_typical_year.
 from __future__ import annotations
 
 import json
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -48,42 +50,64 @@ TIMEZONE = "Europe/Athens"
 # incomplete year.
 START_YEAR = 2015
 END_YEAR = 2024
+# Years per request -- fewer, larger requests instead of one per year, so a
+# single transient network hiccup (e.g. a TLS handshake timeout, seen on a
+# GitHub Actions run 2026-08-24) can't fail the whole fetch by itself; each
+# chunk also gets its own retries below.
+YEARS_PER_CHUNK = 2
 
 OUTPUT_PATH = Path(__file__).resolve().parent.parent / "config" / "weather" / "alexandreia-imathias-typical-year.csv"
 
 ARCHIVE_API_URL = "https://archive-api.open-meteo.com/v1/archive"
 HOURLY_VARS = "temperature_2m,relative_humidity_2m,shortwave_radiation"
 
+MAX_ATTEMPTS = 5
+REQUEST_TIMEOUT_S = 120
 
-def _fetch_year(year: int) -> pd.DataFrame:
+
+def _fetch_range(start_year: int, end_year: int) -> pd.DataFrame:
     params = {
         "latitude": LATITUDE,
         "longitude": LONGITUDE,
-        "start_date": f"{year}-01-01",
-        "end_date": f"{year}-12-31",
+        "start_date": f"{start_year}-01-01",
+        "end_date": f"{end_year}-12-31",
         "hourly": HOURLY_VARS,
         "timezone": TIMEZONE,
     }
     query = "&".join(f"{k}={v}" for k, v in params.items())
     url = f"{ARCHIVE_API_URL}?{query}"
-    print(f"Fetching {year}...")
-    with urllib.request.urlopen(url, timeout=60) as response:
-        payload = json.loads(response.read())
 
-    hourly = payload["hourly"]
-    df = pd.DataFrame(
-        {
-            "timestamp": pd.to_datetime(hourly["time"]),
-            "temp_out_c": hourly["temperature_2m"],
-            "rh_out_pct": hourly["relative_humidity_2m"],
-            "solar_rad_w_m2": hourly["shortwave_radiation"],
-        }
-    )
-    return df
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            print(f"Fetching {start_year}-{end_year} (attempt {attempt}/{MAX_ATTEMPTS})...")
+            with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT_S) as response:
+                payload = json.loads(response.read())
+            hourly = payload["hourly"]
+            return pd.DataFrame(
+                {
+                    "timestamp": pd.to_datetime(hourly["time"]),
+                    "temp_out_c": hourly["temperature_2m"],
+                    "rh_out_pct": hourly["relative_humidity_2m"],
+                    "solar_rad_w_m2": hourly["shortwave_radiation"],
+                }
+            )
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last_error = e
+            wait_s = 2**attempt  # 2, 4, 8, 16, 32
+            print(f"  failed ({e}); retrying in {wait_s}s")
+            if attempt < MAX_ATTEMPTS:
+                time.sleep(wait_s)
+
+    raise RuntimeError(f"Failed to fetch {start_year}-{end_year} after {MAX_ATTEMPTS} attempts") from last_error
 
 
 def main() -> None:
-    all_years = pd.concat([_fetch_year(y) for y in range(START_YEAR, END_YEAR + 1)], ignore_index=True)
+    chunks = [
+        _fetch_range(y, min(y + YEARS_PER_CHUNK - 1, END_YEAR))
+        for y in range(START_YEAR, END_YEAR + 1, YEARS_PER_CHUNK)
+    ]
+    all_years = pd.concat(chunks, ignore_index=True)
 
     all_years["month"] = all_years["timestamp"].dt.month
     all_years["day"] = all_years["timestamp"].dt.day
