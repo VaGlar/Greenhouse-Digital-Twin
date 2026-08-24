@@ -90,6 +90,37 @@ def test_cold_cover_condenses_moisture_out_of_humid_air():
     assert result.condensed_kg > 0.0
 
 
+def test_ventilation_does_not_overshoot_below_vent_setpoint_on_cold_sunny_days():
+    geometry = _geometry()
+    control = _control()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    # Cold outside but strong sun -- pushes indoor well above vent_setpoint, forcing max-ramp
+    # ventilation. Bug (fixed 2026-08-25): the naive linear removal crashed indoor air all the
+    # way down to outdoor temperature instead of stopping at vent_setpoint.
+    hot_state = ClimateState(temp_in_c=20.0, co2_in_ppm=420.0)
+    result = model.step(hot_state, hour=11, temp_out_c=-5.0, solar_rad_w_m2=900.0, dt_hours=1.0)
+
+    vent_setpoint = control.heating_setpoint_day_c + control.vent_temp_margin_c
+    assert result.state.temp_in_c == vent_setpoint
+    assert result.state.temp_in_c > -5.0  # must not have crashed toward outdoor air
+
+
+def test_ventilation_still_floors_at_outdoor_air_on_a_genuinely_hot_day():
+    geometry = _geometry()
+    control = _control()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    # Outdoor air itself is already above vent_setpoint -- ventilation legitimately can't cool
+    # below ambient, this is not the overshoot bug, so the floor should be outdoor temp here.
+    hot_state = ClimateState(temp_in_c=30.0, co2_in_ppm=420.0)
+    result = model.step(hot_state, hour=13, temp_out_c=25.0, solar_rad_w_m2=800.0, dt_hours=1.0)
+
+    assert result.state.temp_in_c >= 25.0
+
+
 def test_screen_deploys_at_night_regardless_of_conditions():
     geometry = _geometry()
     control = _control()

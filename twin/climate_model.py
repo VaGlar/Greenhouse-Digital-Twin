@@ -43,9 +43,7 @@ CO2_DENSITY_KG_M3 = 1.83  # density of CO2 gas at ~20C, used only to convert mas
 WATER_MOLAR_MASS_G_MOL = 18.02  # physical constant
 GAS_CONSTANT_J_MOL_K = 8.314  # physical constant (ideal gas law)
 # PLACEHOLDER: degrees above vent_setpoint over which ventilation ramps from vent_min_ach to
-# vent_max_ach. Also used as the "too hot" screen-shading threshold (vent_setpoint +
-# VENT_RAMP_BAND_C = the point ventilation is already fully ramped) -- shared so the two stay
-# consistent by construction.
+# vent_max_ach.
 VENT_RAMP_BAND_C = 5.0
 
 
@@ -101,6 +99,31 @@ class GreenhouseClimateModel:
         self.control = control
         self._thermal_capacity_j_k = control.effective_heat_capacity_j_m2k * geometry.area_m2
 
+    def _ventilated_temp(
+        self, temp_before_c: float, temp_out_c: float, ach: float, dt_hours: float, vent_setpoint: float
+    ) -> float:
+        """One hour of ventilation cooling at the given ACH. Bug fix 2026-08-25: the naive linear
+        removal (ach * delta_t, applied for the full hour) overshoots badly when ach and delta_t
+        are both large -- e.g. a cold, sunny day: solar gain pushes temp well above vent_setpoint,
+        the ramp logic below correctly reacts with a high ach, but removing a full hour's worth of
+        heat at that rate against a huge indoor-outdoor gradient blew straight through vent_setpoint
+        and crashed to outdoor air temperature (once literally hit exactly, confirmed via a real
+        low-temp run: indoor == outdoor == 3.91C at 11:00, with heat_used_kw=0 because the crash
+        happened via ventilation *after* the heating decision, and vent_ach spiked to 6.4). A real
+        thermostatic vent controller stops removing heat once it reaches its target (vent_setpoint)
+        rather than continuing until indoor matches outdoor -- floor the result there instead,
+        except for the always-present baseline leakage (ach == vent_min_ach), which is passive
+        exchange, not active regulation, and should keep drifting toward outdoor air normally."""
+        dt_s = dt_hours * 3600.0
+        c_total = self._thermal_capacity_j_k
+        delta_t = temp_before_c - temp_out_c
+        vent_removal_w = ach * self.geometry.volume_m3 * AIR_VOLUMETRIC_HEAT_CAPACITY_J_M3K / 3600.0 * delta_t
+        temp_after = temp_before_c - vent_removal_w * dt_s / c_total
+        if delta_t > 0:
+            floor = max(temp_out_c, vent_setpoint) if ach > self.control.vent_min_ach else temp_out_c
+            temp_after = max(temp_after, floor)
+        return temp_after
+
     def decide_screen_deployment(
         self,
         state: ClimateState,
@@ -126,15 +149,18 @@ class GreenhouseClimateModel:
         )
 
         # "Too hot" means ventilation alone (even fully ramped) won't be enough -- not merely
-        # "ventilation has started ramping up", which is its normal job and handles the vast
-        # majority of solar load on its own (confirmed: with no screen at all, actual indoor
-        # temp never exceeded ~25C across a 150-day run even though ventilation ramps starting
-        # right at vent_setpoint). Using vent_setpoint alone made the screen shade ~59% of all
-        # daytime hours and cut yield ~17% for no real overheating benefit -- see
-        # docs/assumptions/climate-control.md.
+        # "ventilation has started ramping up", which is its normal job. Checked by actually
+        # applying max-ACH ventilation (via the same _ventilated_temp helper step() uses) to the
+        # unscreened projection, rather than comparing the raw pre-ventilation number to a fixed
+        # margin -- the fixed-margin version (vent_setpoint + VENT_RAMP_BAND_C) made the screen
+        # shade ~59% of all daytime hours and cut yield ~17% for no real overheating benefit; see
+        # docs/assumptions/climate-control.md for that finding and this one.
         temp_pred_no_screen = state.temp_in_c + (q_solar_w_full - q_trans_loss_w_full) * dt_s / c_total
-        if temp_pred_no_screen > vent_setpoint + VENT_RAMP_BAND_C:
-            return True  # projected overheating even at max ventilation -- shading only helps here
+        temp_after_max_vent = self._ventilated_temp(
+            temp_pred_no_screen, temp_out_c, self.control.vent_max_ach, dt_hours, vent_setpoint
+        )
+        if temp_after_max_vent > vent_setpoint + 0.01:
+            return True  # even full ventilation can't hold vent_setpoint -- shading actually needed
 
         heat_available_w = self.chp.heat_available_kw * 1000.0
         required_w_no_screen = max(0.0, (setpoint - temp_pred_no_screen) * c_total / dt_s)
@@ -199,11 +225,7 @@ class GreenhouseClimateModel:
         ramp_fraction = min(1.0, excess / VENT_RAMP_BAND_C)
         ach = self.control.vent_min_ach + (self.control.vent_max_ach - self.control.vent_min_ach) * ramp_fraction
 
-        delta_t = temp_after_heat - temp_out_c
-        vent_removal_w = ach * self.geometry.volume_m3 * AIR_VOLUMETRIC_HEAT_CAPACITY_J_M3K / 3600.0 * delta_t
-        temp_new = temp_after_heat - vent_removal_w * dt_s / c_total
-        if delta_t > 0:
-            temp_new = max(temp_new, temp_out_c)  # ventilation can't cool below outside air
+        temp_new = self._ventilated_temp(temp_after_heat, temp_out_c, ach, dt_hours, vent_setpoint)
 
         # --- CO2 balance: fixed CHP output, but dosing is capped at the
         # setpoint (like a real CO2 dosing controller) — the rest of the
