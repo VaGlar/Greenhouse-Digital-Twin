@@ -62,13 +62,16 @@ hydroponic:
   system_type: "NFT"   # flag only in v1 — not modeled in depth yet
 
 weather:
-  source: "synthetic"  # PLACEHOLDER by design — switch to "csv" + csv_path once real local weather data is available;
-                        # see docs/assumptions/weather.md — this is the highest-value real-data upgrade available
-  latitude_deg: 37.9           # site-specific (Athens) — NOTE: currently unused by the synthetic generator's math
-  mean_annual_temp_c: 18.0     # SITE-SPECIFIC, plausible: roughly matches Athens/Attica annual mean (~17-19C)
-  seasonal_amplitude_c: 9.0    # PLACEHOLDER: plausible Mediterranean order of magnitude, not verified vs. real station data
-  diurnal_amplitude_c: 6.0     # PLACEHOLDER: same, not verified
-  peak_solar_w_m2: 850.0       # PLACEHOLDER, plausible: Mediterranean summer noon peak commonly cited 800-1000 W/m2
+  source: "csv_typical_year"   # SOURCED: real 10-year (2015-2024) hourly average for Αλεξάνδρεια Ημαθίας, via the
+                                # Open-Meteo Historical Weather API — see docs/assumptions/weather.md,
+                                # papers/open-meteo-historical-weather-api.md. Replaces the synthetic sine-wave
+                                # generator below, which is kept only as source: "synthetic" fallback values.
+  csv_path: config/weather/alexandreia-imathias-typical-year.csv
+  latitude_deg: 40.63          # SITE-SPECIFIC: Αλεξάνδρεια Ημαθίας — still unused by the model's math (see weather.md)
+  mean_annual_temp_c: 18.0     # unused while source is csv_typical_year — only feeds the "synthetic" generator
+  seasonal_amplitude_c: 9.0    # unused while source is csv_typical_year — only feeds the "synthetic" generator
+  diurnal_amplitude_c: 6.0     # unused while source is csv_typical_year — only feeds the "synthetic" generator
+  peak_solar_w_m2: 850.0       # unused while source is csv_typical_year — only feeds the "synthetic" generator
 
 simulation:
   start_date: 2026-09-15
