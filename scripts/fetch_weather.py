@@ -6,11 +6,14 @@ is free, requires no API key, and is licensed for non-commercial use (CC BY 4.0
 attribution to Open-Meteo / the underlying reanalysis datasets) -- see their site
 for commercial licensing if this greenhouse's use ever becomes commercial.
 
-Run this once, from an environment with normal internet access (e.g. a
-GitHub Codespace terminal -- this repo's own sandboxed dev session cannot
-reach external hosts):
+Run this once, from an environment with normal internet access -- this
+repo's own sandboxed dev session cannot reach external hosts. Two ways:
 
-    python scripts/fetch_weather.py
+  - GitHub Actions: run the "Fetch weather data" workflow manually
+    (.github/workflows/fetch-weather.yml, Actions tab -> Run workflow).
+    It runs this script on a GitHub-hosted runner and commits the result
+    automatically -- no local setup needed.
+  - Locally / in a Codespace terminal: `python scripts/fetch_weather.py`
 
 It writes config/weather/alexandreia-imathias-typical-year.csv. After that,
 switch config/greenhouse_example.yaml's weather block to:
