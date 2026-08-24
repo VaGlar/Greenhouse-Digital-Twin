@@ -307,7 +307,7 @@ function App() {
       </section>
 
       <button className="run-button" onClick={handleRun} disabled={loading}>
-        {loading ? "Τρέχει η προσομοίωση…" : "Run simulation"}
+        {loading ? "Τρέχει η προσομοίωση…" : "Εκτέλεση προσομοίωσης"}
       </button>
 
       {error && <p className="error">{error}</p>}
@@ -318,6 +318,7 @@ function App() {
             <StatTile label="Τελικό yield" value={`${result.summary.final_yield_kg_m2.toFixed(2)} kg/m²`} />
             <StatTile label="Συνολική παραγωγή" value={`${result.summary.total_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`} />
             <StatTile label="Διάρκεια" value={`${result.summary.duration_days} μέρες`} />
+            <StatTile label="Θερμική κατανάλωση" value={`${result.summary.total_heat_used_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`} />
           </section>
 
           <div className="chart-grid">
@@ -332,6 +333,19 @@ function App() {
                 <Legend />
                 <Line type="monotone" dataKey="temp_in_c" name="Εσωτερική" stroke="var(--series-1)" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="temp_out_c" name="Εξωτερική" stroke="var(--series-2)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </section>
+
+          <section className="chart-card">
+            <h2>Θερμική κατανάλωση</h2>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="var(--gridline)" vertical={false} />
+                <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
+                <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" kWh" width={64} />
+                <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
+                <Line type="monotone" dataKey="heat_used_kwh" name="Κατανάλωση/ημέρα" stroke="var(--energy)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </section>
