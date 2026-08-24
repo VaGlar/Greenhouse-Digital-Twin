@@ -24,6 +24,8 @@ export interface GreenhouseConfig {
     heating_setpoint_day_c: number;
     heating_setpoint_night_c: number;
     co2_setpoint_day_ppm: number;
+    day_start_hour: number;
+    day_end_hour: number;
     screen_energy_saving_fraction: number;
     dehumidification_setpoint_pct: number;
     [key: string]: unknown;
@@ -60,7 +62,8 @@ export interface SimulationOverrides {
   heating_setpoint_day_c?: number;
   heating_setpoint_night_c?: number;
   co2_setpoint_day_ppm?: number;
-  screen_energy_saving_fraction?: number;
+  day_start_hour?: number;
+  day_end_hour?: number;
   dehumidification_setpoint_pct?: number;
 }
 

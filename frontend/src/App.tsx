@@ -25,7 +25,8 @@ type SliderKey =
   | "heating_setpoint_day_c"
   | "heating_setpoint_night_c"
   | "co2_setpoint_day_ppm"
-  | "screen_energy_saving_fraction_pct"
+  | "day_start_hour"
+  | "day_end_hour"
   | "dehumidification_setpoint_pct"
   | "duration_days";
 
@@ -93,12 +94,21 @@ const SLIDER_GROUPS: SliderGroup[] = [
     zone: "humidity",
     sliders: [
       {
-        key: "screen_energy_saving_fraction_pct",
-        label: "Θερμοκουρτίνα (εξοικονόμηση, νύχτα)",
-        unit: "%",
+        key: "day_start_hour",
+        label: "Ώρα έναρξης ημέρας (ανοίγει η θερμοκουρτίνα)",
+        unit: ":00",
         min: 0,
-        max: 80,
-        step: 5,
+        max: 12,
+        step: 1,
+      },
+      {
+        key: "day_end_hour",
+        label: "Ώρα λήξης ημέρας (κλείνει η θερμοκουρτίνα)",
+        unit: ":00",
+        min: 12,
+        max: 24,
+        step: 1,
+        note: "Η θερμοκουρτίνα είναι πάντα κλειστή τη νύχτα (εκτός ωραρίου ημέρας) με σταθερή εξοικονόμηση 55% — χαρακτηριστικό του συγκεκριμένου προϊόντος, όχι κάτι που ρυθμίζεται.",
       },
       {
         key: "dehumidification_setpoint_pct",
@@ -148,7 +158,8 @@ const DEFAULT_SLIDER_VALUES: Record<SliderKey, number> = {
   heating_setpoint_day_c: 20,
   heating_setpoint_night_c: 17,
   co2_setpoint_day_ppm: 900,
-  screen_energy_saving_fraction_pct: 55,
+  day_start_hour: 6,
+  day_end_hour: 20,
   dehumidification_setpoint_pct: 70,
   duration_days: 150,
 };
@@ -172,7 +183,8 @@ function App() {
           heating_setpoint_day_c: c.climate_control.heating_setpoint_day_c,
           heating_setpoint_night_c: c.climate_control.heating_setpoint_night_c,
           co2_setpoint_day_ppm: c.climate_control.co2_setpoint_day_ppm,
-          screen_energy_saving_fraction_pct: Math.round(c.climate_control.screen_energy_saving_fraction * 100),
+          day_start_hour: c.climate_control.day_start_hour,
+          day_end_hour: c.climate_control.day_end_hour,
           dehumidification_setpoint_pct: c.climate_control.dehumidification_setpoint_pct,
           duration_days: c.simulation.duration_days,
         });
@@ -186,10 +198,8 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const { screen_energy_saving_fraction_pct, ...restSliderValues } = sliderValues;
       const overrides: SimulationOverrides = {
-        ...restSliderValues,
-        screen_energy_saving_fraction: screen_energy_saving_fraction_pct / 100,
+        ...sliderValues,
         crop_variety: cropVariety || undefined,
         start_date: startDate || undefined,
       };
@@ -242,7 +252,8 @@ function App() {
         rhPct={latestDay?.rh_in_pct ?? null}
         vpdKpa={latestDay?.vpd_kpa ?? null}
         co2Ppm={latestDay?.co2_in_ppm ?? null}
-        screenSavingPct={sliderValues.screen_energy_saving_fraction_pct}
+        screenSavingPct={config ? config.climate_control.screen_energy_saving_fraction * 100 : 55}
+        screenScheduleLabel={`κλειστή ${sliderValues.day_end_hour}:00–${sliderValues.day_start_hour}:00`}
         dehumidSetpointPct={sliderValues.dehumidification_setpoint_pct}
         yieldKgM2={latestDay?.fruit_fresh_yield_kg_m2 ?? null}
       />
