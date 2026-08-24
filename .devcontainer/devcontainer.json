@@ -7,11 +7,13 @@
   "portsAttributes": {
     "8123": {
       "label": "Backend API",
-      "onAutoForward": "notify"
+      "onAutoForward": "notify",
+      "visibility": "public"
     },
     "5173": {
       "label": "Frontend",
-      "onAutoForward": "openBrowser"
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
     }
   }
 }
