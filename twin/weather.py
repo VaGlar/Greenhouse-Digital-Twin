@@ -1,10 +1,20 @@
 """External weather input.
 
-v1 supports two sources:
-  - "csv": historical hourly weather from a local CSV file
-            (columns: timestamp, temp_out_c, solar_rad_w_m2, rh_out_pct)
+Supports three sources:
+  - "csv": historical hourly weather from a local CSV file, matched by exact
+            calendar date (columns: timestamp, temp_out_c, solar_rad_w_m2,
+            rh_out_pct) -- for real historical data covering the exact dates
+            being simulated.
+  - "csv_typical_year": a real-site "typical year" built by averaging several
+            years of historical data per (month, day, hour) -- see
+            scripts/fetch_weather.py. Looked up cyclically by calendar
+            month/day/hour regardless of which actual year the simulation's
+            start_date falls in, since simulations commonly run against
+            future planting dates that real historical data can't cover
+            directly (columns: month, day, hour, temp_out_c, solar_rad_w_m2,
+            rh_out_pct).
   - "synthetic": a seasonal + diurnal sinusoidal generator, used when no
-            real historical data is available yet for the target site.
+            real weather data is available yet for the target site.
 """
 
 from __future__ import annotations
@@ -29,6 +39,8 @@ class WeatherPoint:
 def load_weather(params: WeatherParams, start_date: date, duration_days: int, timestep_hours: float) -> pd.DataFrame:
     if params.source == "csv":
         return _load_csv(params, start_date, duration_days)
+    if params.source == "csv_typical_year":
+        return _load_csv_typical_year(params, start_date, duration_days, timestep_hours)
     if params.source == "synthetic":
         return _generate_synthetic(params, start_date, duration_days, timestep_hours)
     raise ValueError(f"Unknown weather source: {params.source!r}")
@@ -52,6 +64,42 @@ def _load_csv(params: WeatherParams, start_date: date, duration_days: int) -> pd
             f"{start_date} .. {end_date}"
         )
     return df
+
+
+def _load_csv_typical_year(
+    params: WeatherParams, start_date: date, duration_days: int, timestep_hours: float
+) -> pd.DataFrame:
+    if not params.csv_path:
+        raise ValueError("weather.csv_path is required when weather.source == 'csv_typical_year'")
+    template = pd.read_csv(params.csv_path)
+    required = {"month", "day", "hour", "temp_out_c", "solar_rad_w_m2", "rh_out_pct"}
+    missing = required - set(template.columns)
+    if missing:
+        raise ValueError(f"typical-year weather CSV is missing required columns: {sorted(missing)}")
+    template = template.set_index(["month", "day", "hour"])
+
+    n_steps = int(duration_days * 24 / timestep_hours)
+    start_dt = datetime.combine(start_date, datetime.min.time())
+
+    rows = []
+    for i in range(n_steps):
+        ts = start_dt + timedelta(hours=i * timestep_hours)
+        key = (ts.month, ts.day, ts.hour)
+        if key not in template.index:
+            # Feb 29 in a simulation year that's a leap year, but no leap year
+            # in the fetched history had that date -- fall back to Feb 28.
+            key = (ts.month, 28, ts.hour) if ts.month == 2 and ts.day == 29 else key
+        row = template.loc[key]
+        rows.append(
+            WeatherPoint(
+                timestamp=ts,
+                temp_out_c=float(row["temp_out_c"]),
+                solar_rad_w_m2=float(row["solar_rad_w_m2"]),
+                rh_out_pct=float(row["rh_out_pct"]),
+            )
+        )
+
+    return pd.DataFrame([r.__dict__ for r in rows])
 
 
 def _generate_synthetic(
