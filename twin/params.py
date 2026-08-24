@@ -178,7 +178,7 @@ class HydroponicParams:
 
 @dataclass
 class WeatherParams:
-    source: str = "synthetic"  # "csv" or "synthetic"
+    source: str = "synthetic"  # "synthetic", "csv" (exact-date historical), or "csv_typical_year"
     csv_path: str | None = None
     latitude_deg: float = 37.9  # default: Athens, Greece
     mean_annual_temp_c: float = 18.0

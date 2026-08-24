@@ -1,0 +1,37 @@
+name: Fetch weather data
+
+# Manual trigger only -- this fetches a "typical year" for the greenhouse's
+# real site (see scripts/fetch_weather.py) and commits the resulting CSV.
+# Not on a schedule: the underlying historical average changes negligibly
+# from month to month, so there's no reason to re-run this automatically.
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install pandas
+
+      - run: python scripts/fetch_weather.py
+
+      - name: Commit and push if the weather data changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add config/weather/alexandreia-imathias-typical-year.csv
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update Alexandreia Imathias typical-year weather data"
+            git push
+          fi
