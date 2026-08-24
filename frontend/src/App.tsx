@@ -4,6 +4,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -25,8 +26,8 @@ type SliderKey =
   | "heating_setpoint_day_c"
   | "heating_setpoint_night_c"
   | "co2_setpoint_day_ppm"
-  | "day_start_hour"
-  | "day_end_hour"
+  | "screen_open_hour"
+  | "screen_close_hour"
   | "dehumidification_setpoint_pct"
   | "duration_days";
 
@@ -94,21 +95,21 @@ const SLIDER_GROUPS: SliderGroup[] = [
     zone: "humidity",
     sliders: [
       {
-        key: "day_start_hour",
-        label: "Ώρα έναρξης ημέρας (ανοίγει η θερμοκουρτίνα)",
+        key: "screen_open_hour",
+        label: "Ώρα ανοίγματος θερμοκουρτίνας",
         unit: ":00",
         min: 0,
         max: 12,
         step: 1,
       },
       {
-        key: "day_end_hour",
-        label: "Ώρα λήξης ημέρας (κλείνει η θερμοκουρτίνα)",
+        key: "screen_close_hour",
+        label: "Ώρα κλεισίματος θερμοκουρτίνας",
         unit: ":00",
         min: 12,
         max: 24,
         step: 1,
-        note: "Η θερμοκουρτίνα είναι πάντα κλειστή τη νύχτα (εκτός ωραρίου ημέρας) με σταθερή εξοικονόμηση 55% — χαρακτηριστικό του συγκεκριμένου προϊόντος, όχι κάτι που ρυθμίζεται.",
+        note: "Ρυθμίζει μόνο πότε κλείνει/ανοίγει η κουρτίνα (σταθερή εξοικονόμηση 55% όσο είναι κλειστή) — δεν επηρεάζει τη θερμοκρασία-στόχο ή τη δοσολογία CO2, που έχουν δικό τους ανεξάρτητο ωράριο.",
       },
       {
         key: "dehumidification_setpoint_pct",
@@ -158,8 +159,8 @@ const DEFAULT_SLIDER_VALUES: Record<SliderKey, number> = {
   heating_setpoint_day_c: 20,
   heating_setpoint_night_c: 17,
   co2_setpoint_day_ppm: 900,
-  day_start_hour: 6,
-  day_end_hour: 20,
+  screen_open_hour: 6,
+  screen_close_hour: 20,
   dehumidification_setpoint_pct: 70,
   duration_days: 150,
 };
@@ -183,8 +184,8 @@ function App() {
           heating_setpoint_day_c: c.climate_control.heating_setpoint_day_c,
           heating_setpoint_night_c: c.climate_control.heating_setpoint_night_c,
           co2_setpoint_day_ppm: c.climate_control.co2_setpoint_day_ppm,
-          day_start_hour: c.climate_control.day_start_hour,
-          day_end_hour: c.climate_control.day_end_hour,
+          screen_open_hour: c.climate_control.screen_open_hour,
+          screen_close_hour: c.climate_control.screen_close_hour,
           dehumidification_setpoint_pct: c.climate_control.dehumidification_setpoint_pct,
           duration_days: c.simulation.duration_days,
         });
@@ -253,7 +254,7 @@ function App() {
         vpdKpa={latestDay?.vpd_kpa ?? null}
         co2Ppm={latestDay?.co2_in_ppm ?? null}
         screenSavingPct={config ? config.climate_control.screen_energy_saving_fraction * 100 : 55}
-        screenScheduleLabel={`κλειστή ${sliderValues.day_end_hour}:00–${sliderValues.day_start_hour}:00`}
+        screenScheduleLabel={`κλειστή ${sliderValues.screen_close_hour}:00–${sliderValues.screen_open_hour}:00`}
         dehumidSetpointPct={sliderValues.dehumidification_setpoint_pct}
         yieldKgM2={latestDay?.fruit_fresh_yield_kg_m2 ?? null}
       />
@@ -338,14 +339,21 @@ function App() {
           </section>
 
           <section className="chart-card">
-            <h2>Θερμική κατανάλωση</h2>
+            <h2>Θερμική κατανάλωση (μέση ισχύς/ώρα)</h2>
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="var(--gridline)" vertical={false} />
                 <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
-                <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" kWh" width={64} />
+                <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" kW" width={56} />
                 <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
-                <Line type="monotone" dataKey="heat_used_kwh" name="Κατανάλωση/ημέρα" stroke="var(--energy)" strokeWidth={2} dot={false} />
+                <Legend />
+                <ReferenceLine
+                  y={result.summary.max_heat_available_kw}
+                  stroke="var(--amber)"
+                  strokeDasharray="5 4"
+                  label={{ value: "Μέγιστη ισχύς CHP", position: "insideTopRight", fill: "var(--amber)", fontSize: 11 }}
+                />
+                <Line type="monotone" dataKey="heat_used_kw" name="Μέση ισχύς" stroke="var(--energy)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </section>

@@ -12,9 +12,11 @@ output are also fixed. The greenhouse draws what it needs from that fixed
 supply; the rest is dumped (excess heat) or vented (excess CO2) — the CHP
 itself is never modulated based on greenhouse demand.
 
-Thermal screen: deployed every night (retracted during the day), cutting
-transmission heat loss by a fixed fraction. Modeled as a simple day/night
-toggle, not a continuous deploy/retract control loop.
+Thermal screen: deployed on its own schedule (screen_open_hour/screen_close_hour,
+defaults to night only), cutting transmission heat loss by a fixed fraction.
+Modeled as a simple open/closed toggle, not a continuous deploy/retract
+control loop. Deliberately a separate schedule from day_start_hour/day_end_hour
+(which gate the heating setpoint and CO2 dosing) -- see ClimateControlParams.
 
 Humidity: tracked as vapor pressure (kPa), the same way real greenhouse
 models do (rather than tracking relative humidity directly, which is
@@ -103,9 +105,10 @@ class GreenhouseClimateModel:
         # --- Energy balance: solar gain vs. transmission loss ---
         q_solar_w = solar_rad_w_m2 * self.geometry.area_m2 * self.geometry.cover_transmissivity
         q_trans_loss_w = self.geometry.cover_u_value_w_m2k * self.geometry.cover_area_m2 * (state.temp_in_c - temp_out_c)
-        # Thermal screen: deployed at night only (retracted during the day so it doesn't block
-        # light) -- cuts transmission heat loss by its rated energy-saving fraction.
-        if not self.control.is_daytime(hour):
+        # Thermal screen: deployed on its own schedule (screen_open_hour/screen_close_hour),
+        # independent of the heating/CO2 day-night window -- cuts transmission heat loss by its
+        # rated energy-saving fraction while deployed.
+        if self.control.is_screen_deployed(hour):
             q_trans_loss_w *= 1.0 - self.control.screen_energy_saving_fraction
         net_w = q_solar_w - q_trans_loss_w
         temp_pred = state.temp_in_c + net_w * dt_s / c_total

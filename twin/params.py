@@ -90,6 +90,14 @@ class ClimateControlParams:
     # night. Real product spec (Ludvig Svensson-style PH55, 55% shading/55% energy saving) from
     # a real vendor quote for this greenhouse. See papers/geothermiki-s192g-quote.md.
     screen_energy_saving_fraction: float = 0.55
+    # PLACEHOLDER: when the thermal screen deploys/retracts. Deliberately a SEPARATE clock window
+    # from day_start_hour/day_end_hour (which only gate the heating setpoint and CO2 dosing) --
+    # they default to the same hours but must stay independent, otherwise widening the screen's
+    # "open" window also silently keeps the daytime heating setpoint and CO2 dosing active for
+    # more hours, inflating yield for reasons that have nothing to do with the screen itself
+    # (found 2026-08-24 when "never closing" the screen raised yield). See climate-control.md.
+    screen_open_hour: int = 6
+    screen_close_hour: int = 20
     # PLACEHOLDER: cover surface temperature as a fraction of the way from outdoor to indoor air
     # temperature -- a thin PE film has little thermal resistance of its own compared to the air
     # boundary layers on each side, so its surface sits closer to outdoor temperature than indoor.
@@ -108,6 +116,8 @@ class ClimateControlParams:
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
             raise ValueError("day_start_hour/day_end_hour must be within [0, 24]")
+        if not 0 <= self.screen_open_hour < 24 or not 0 <= self.screen_close_hour <= 24:
+            raise ValueError("screen_open_hour/screen_close_hour must be within [0, 24]")
         if self.vent_max_ach < self.vent_min_ach:
             raise ValueError("vent_max_ach must be >= vent_min_ach")
         if self.effective_heat_capacity_j_m2k <= 0:
@@ -123,6 +133,9 @@ class ClimateControlParams:
 
     def is_daytime(self, hour: int) -> bool:
         return self.day_start_hour <= hour < self.day_end_hour
+
+    def is_screen_deployed(self, hour: int) -> bool:
+        return not (self.screen_open_hour <= hour < self.screen_close_hour)
 
     def heating_setpoint(self, hour: int) -> float:
         return self.heating_setpoint_day_c if self.is_daytime(hour) else self.heating_setpoint_night_c
