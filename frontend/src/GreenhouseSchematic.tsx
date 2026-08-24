@@ -39,8 +39,8 @@ interface GreenhouseSchematicProps {
   co2Ppm: number | null;
   /** Fixed product spec (not user-adjustable) — see docs/assumptions/climate-control.md. */
   screenSavingPct: number;
-  /** e.g. "κλειστή 20:00–6:00" — derived from the day/end schedule, the only thing the user controls. */
-  screenScheduleLabel: string;
+  /** Season-average % of hours the screen was deployed — fully automatic, no user control. */
+  screenDeployedPct: number | null;
   dehumidSetpointPct: number;
   yieldKgM2: number | null;
 }
@@ -58,7 +58,7 @@ export function GreenhouseSchematic({
   vpdKpa,
   co2Ppm,
   screenSavingPct,
-  screenScheduleLabel,
+  screenDeployedPct,
   dehumidSetpointPct,
   yieldKgM2,
 }: GreenhouseSchematicProps) {
@@ -75,7 +75,13 @@ export function GreenhouseSchematic({
     // shown as "σταθερό" (fixed); the schedule pin below it is the one thing
     // the user actually controls.
     { x: 100, y: 84, label: "Εξοικονόμηση (σταθερό)", value: `${screenSavingPct.toFixed(0)}%`, anchor: "start" },
-    { x: 100, y: 96, label: "Ωράριο", value: screenScheduleLabel, anchor: "start" },
+    {
+      x: 100,
+      y: 96,
+      label: "Κλειστή",
+      value: screenDeployedPct === null ? "αυτόματα (νύχτα/ζέστη/κρύο)" : `${screenDeployedPct.toFixed(0)}% του χρόνου`,
+      anchor: "start",
+    },
     { x: 455, y: 52, label: "Στόχος RH (είσοδος)", value: `${dehumidSetpointPct.toFixed(0)}%`, anchor: "start" },
     { x: 320, y: 250, label: "Yield μέχρι τώρα", value: fmt(yieldKgM2, 2, " kg/m²"), anchor: "middle" },
   ];

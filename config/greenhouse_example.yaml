@@ -37,11 +37,11 @@ climate_control:
                                      # found 700ppm optimal, no yield benefit above it (papers/tomato-co2-optimum-700ppm.md)
   co2_ambient_ppm: 420.0           # SOURCED, factual: current global atmospheric CO2 (~420-425ppm, NOAA/Mauna Loa)
   effective_heat_capacity_j_m2k: 40000.0  # PLACEHOLDER: lumped single-zone thermal mass estimate, not measured
-  screen_energy_saving_fraction: 0.55  # SOURCED: real thermal screen spec (type PH55), deployed at night
-                                         # (papers/geothermiki-s192g-quote.md — 55% shading / 55% energy saving)
-  screen_open_hour: 6              # PLACEHOLDER: screen's own deploy/retract schedule, kept separate from
-  screen_close_hour: 20            # day_start_hour/day_end_hour above so adjusting it doesn't also shift
-                                     # the heating/CO2 schedule (see docs/assumptions/climate-control.md)
+  screen_energy_saving_fraction: 0.55  # SOURCED: real thermal screen spec (type PH55) — 55% shading AND
+                                         # ~55% energy saving, same fabric (papers/geothermiki-s192g-quote.md)
+  chp_heat_margin_fraction: 0.9    # PLACEHOLDER: safety margin for the screen's cold-trigger — see
+                                     # docs/assumptions/climate-control.md. Deployment is fully automatic
+                                     # (night / too-hot / cold-with-net-benefit), not user-configurable.
   dehumidification_setpoint_pct: 70.0   # SOURCED: pollination optimum for greenhouse tomato RH
                                          # (papers/greenhouse-tomato-optimal-rh.md); active dehum. modeled as unconstrained
 

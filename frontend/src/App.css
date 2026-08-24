@@ -377,6 +377,18 @@
   line-height: 1.4;
 }
 
+.form-group-info {
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--humidity) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--humidity) 25%, transparent);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 0;
+  line-height: 1.5;
+}
+
 .form-field {
   display: flex;
   flex-direction: column;
