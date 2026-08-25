@@ -23,7 +23,14 @@ export interface GreenhouseConfig {
     cover_transmissivity: number;
   };
   chp: { electric_power_kw: number; heat_to_power_ratio: number; co2_kg_per_kwh_elec: number };
-  crop: { variety: string; planting_date: string; density_plants_per_m2: number };
+  crop: {
+    variety: string;
+    planting_date: string;
+    density_plants_per_m2: number;
+    fruiting_start_days: number;
+    fruiting_ramp_days: number;
+    [key: string]: unknown;
+  };
   simulation: { start_date: string; duration_days: number; timestep_hours: number };
   climate_control: {
     heating_setpoint_day_c: number;

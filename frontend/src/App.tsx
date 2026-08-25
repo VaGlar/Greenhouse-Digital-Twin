@@ -15,6 +15,7 @@ import { GreenhouseSchematic, type ZoneKey } from "./GreenhouseSchematic";
 import {
   getConfig,
   runSimulation,
+  type DailyPoint,
   type GreenhouseConfig,
   type SimulationOverrides,
   type SimulationResult,
@@ -242,6 +243,19 @@ function App() {
                     onChange={(e) => setCropVariety(e.target.value)}
                   />
                 </div>
+                {config && (
+                  <CropPhaseTimeline
+                    durationDays={sliderValues.duration_days}
+                    fruitingStartDays={config.crop.fruiting_start_days}
+                    fruitingRampDays={config.crop.fruiting_ramp_days}
+                  />
+                )}
+                {result && (
+                  <div className="side-field">
+                    <span className="side-field-label">Σωρευτική παραγωγή μέχρι τώρα</span>
+                    <Sparkline data={result.daily_series} dataKey="fruit_fresh_yield_kg_m2" color="var(--series-4)" />
+                  </div>
+                )}
               </>
             )}
 
@@ -255,40 +269,53 @@ function App() {
             )}
 
             {activeTab === "chp" && config && (
-              <dl className="spec-list">
-                <div className="spec-row">
-                  <dt>Εμβαδόν</dt>
-                  <dd>{config.geometry.area_m2.toLocaleString()} m²</dd>
-                </div>
-                <div className="spec-row">
-                  <dt>Ύψος</dt>
-                  <dd>{config.geometry.height_m.toFixed(2)} m</dd>
-                </div>
-                <div className="spec-row">
-                  <dt>U-value κάλυψης</dt>
-                  <dd>{config.geometry.cover_u_value_w_m2k.toFixed(1)} W/m²K</dd>
-                </div>
-                <div className="spec-row">
-                  <dt>Διαπερατότητα</dt>
-                  <dd>{(config.geometry.cover_transmissivity * 100).toFixed(0)}%</dd>
-                </div>
-                <div className="spec-row spec-row-section">
-                  <dt>CHP ισχύς</dt>
-                  <dd>{config.chp.electric_power_kw.toLocaleString()} kW</dd>
-                </div>
-                <div className="spec-row">
-                  <dt>Λόγος θερμότητας/ισχύος</dt>
-                  <dd>{config.chp.heat_to_power_ratio.toFixed(2)}</dd>
-                </div>
-                <div className="spec-row">
-                  <dt>Θερμική ισχύς (σταθερή)</dt>
-                  <dd>{(config.chp.electric_power_kw * config.chp.heat_to_power_ratio).toLocaleString()} kW</dd>
-                </div>
-                <div className="spec-row">
-                  <dt>Fan-pad ψύξη</dt>
-                  <dd>{config.climate_control.fan_pad_cooling_enabled ? "Ενεργή" : "Ανενεργή"}</dd>
-                </div>
-              </dl>
+              <>
+                {result && latestDay && (
+                  <>
+                    <PowerGauge
+                      label="Θερμική ισχύς (τελευταία ημέρα)"
+                      value={latestDay.heat_used_kw}
+                      max={result.summary.max_heat_available_kw}
+                      unit=" kW"
+                    />
+                    <ScreenStatusBadge hours={latestDay.screen_closed_hours} />
+                  </>
+                )}
+                <dl className="spec-list">
+                  <div className="spec-row">
+                    <dt>Εμβαδόν</dt>
+                    <dd>{config.geometry.area_m2.toLocaleString()} m²</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>Ύψος</dt>
+                    <dd>{config.geometry.height_m.toFixed(2)} m</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>U-value κάλυψης</dt>
+                    <dd>{config.geometry.cover_u_value_w_m2k.toFixed(1)} W/m²K</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>Διαπερατότητα</dt>
+                    <dd>{(config.geometry.cover_transmissivity * 100).toFixed(0)}%</dd>
+                  </div>
+                  <div className="spec-row spec-row-section">
+                    <dt>CHP ισχύς</dt>
+                    <dd>{config.chp.electric_power_kw.toLocaleString()} kW</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>Λόγος θερμότητας/ισχύος</dt>
+                    <dd>{config.chp.heat_to_power_ratio.toFixed(2)}</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>Θερμική ισχύς (σταθερή)</dt>
+                    <dd>{(config.chp.electric_power_kw * config.chp.heat_to_power_ratio).toLocaleString()} kW</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>Fan-pad ψύξη</dt>
+                    <dd>{config.climate_control.fan_pad_cooling_enabled ? "Ενεργή" : "Ανενεργή"}</dd>
+                  </div>
+                </dl>
+              </>
             )}
 
             {activeTab === "weather" && config && (
@@ -488,6 +515,118 @@ function StatTile({ label, value }: { label: string; value: string }) {
       <span className="stat-label">{label}</span>
       <span className="stat-value">{value}</span>
     </div>
+  );
+}
+
+/** Compact horizontal gauge: current value vs. a fixed max, e.g. current CHP thermal
+ * draw against the plant's fixed heat_available_kw ceiling. */
+function PowerGauge({ label, value, max, unit }: { label: string; value: number; max: number; unit: string }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div className="gauge">
+      <div className="gauge-head">
+        <span className="gauge-label">{label}</span>
+        <span className="gauge-value">
+          {value.toFixed(0)}
+          {unit} / {max.toLocaleString()}
+          {unit}
+        </span>
+      </div>
+      <div className="gauge-track">
+        <div className="gauge-fill" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** Thermal-screen deployment for the last simulated day, as a fraction of 24h —
+ * the screen's automatic controller (see twin/climate_model.py) has no single
+ * on/off "now" state, only how many hours it was closed that day. */
+function ScreenStatusBadge({ hours }: { hours: number }) {
+  const pct = (hours / 24) * 100;
+  const state = pct >= 90 ? "Κλειστή" : pct <= 5 ? "Ανοιχτή" : "Μερικώς κλειστή";
+  return (
+    <div className="gauge">
+      <div className="gauge-head">
+        <span className="gauge-label">Θερμοκουρτίνα (τελευταία ημέρα)</span>
+        <span className="gauge-value">
+          {state} — {hours.toFixed(1)}/24h
+        </span>
+      </div>
+      <div className="gauge-track">
+        <div className="gauge-fill screen" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** Static reference band over the selected run length, split at the model's own
+ * fruiting_start_days/fruiting_ramp_days (twin/crop_model.py _fruit_partition_fraction) —
+ * not a live "day N of N" progress bar, since a run always simulates the full
+ * duration in one batch rather than advancing day-by-day. */
+function CropPhaseTimeline({
+  durationDays,
+  fruitingStartDays,
+  fruitingRampDays,
+}: {
+  durationDays: number;
+  fruitingStartDays: number;
+  fruitingRampDays: number;
+}) {
+  const vegEnd = Math.min(fruitingStartDays, durationDays);
+  const rampEnd = Math.min(fruitingStartDays + fruitingRampDays, durationDays);
+  const vegPct = (vegEnd / durationDays) * 100;
+  const rampPct = ((rampEnd - vegEnd) / durationDays) * 100;
+  const fullPct = 100 - vegPct - rampPct;
+  return (
+    <div className="phase-timeline">
+      <span className="side-field-label">Φάσεις καλλιέργειας ({durationDays} μέρες)</span>
+      <div className="phase-bar">
+        <div
+          className="phase-segment veg"
+          style={{ width: `${vegPct}%` }}
+          title={`Βλαστική ανάπτυξη: 0–${vegEnd.toFixed(0)} μέρες`}
+        />
+        <div
+          className="phase-segment ramp"
+          style={{ width: `${rampPct}%` }}
+          title={`Έναρξη καρποφορίας: ${vegEnd.toFixed(0)}–${rampEnd.toFixed(0)} μέρες`}
+        />
+        <div
+          className="phase-segment full"
+          style={{ width: `${fullPct}%` }}
+          title={`Πλήρης καρποφορία: ${rampEnd.toFixed(0)}–${durationDays} μέρες`}
+        />
+      </div>
+      <div className="phase-legend">
+        <span>
+          <i className="dot veg" /> Βλαστική
+        </span>
+        <span>
+          <i className="dot ramp" /> Έναρξη καρποφορίας
+        </span>
+        <span>
+          <i className="dot full" /> Πλήρης καρποφορία
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Sparkline({ data, dataKey, color }: { data: DailyPoint[]; dataKey: keyof DailyPoint; color: string }) {
+  return (
+    <ResponsiveContainer width="100%" height={56}>
+      <LineChart data={data} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+        <Line
+          type="monotone"
+          dataKey={dataKey as string}
+          stroke={color}
+          strokeWidth={2}
+          dot={false}
+          isAnimationActive={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
 
