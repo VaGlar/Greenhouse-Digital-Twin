@@ -1,3 +1,5 @@
+import pytest
+
 from twin.climate_model import ClimateState, GreenhouseClimateModel
 from twin.params import CHPParams, ClimateControlParams, GeometryParams
 
@@ -236,8 +238,27 @@ def test_fan_pad_cooling_disengaged_when_toggle_is_off_even_if_efficiency_is_set
 
 
 def test_active_dehumidification_caps_relative_humidity_at_setpoint():
+    # Moderate demand, within the default 75 kg/hour capacity -- reaches the setpoint.
     geometry = _geometry()
-    control = _control()  # dehumidification_setpoint_pct defaults to 85.0
+    control = _control()  # dehumidification_setpoint_pct defaults to 70.0
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    humid_state = ClimateState(temp_in_c=20.0, co2_in_ppm=420.0, vapor_pressure_kpa=1.68)
+    result = model.step(humid_state, hour=2, temp_out_c=18.0, solar_rad_w_m2=0.0, dt_hours=1.0, rh_out_pct=95.0)
+
+    assert result.rh_in_pct <= control.dehumidification_setpoint_pct + 0.01
+    assert result.dehumidified_kg > 0.0
+    assert result.dehumidified_kg < control.dehumidification_capacity_kg_water_per_hour
+
+
+def test_dehumidification_is_capped_by_real_capacity_under_extreme_demand():
+    # Bug fix 2026-08-25: active dehumidification used to be unconstrained (always assumed
+    # sufficient to reach the setpoint within the hour). Under demand that exceeds the real
+    # removal capacity, the setpoint should NOT be fully reached -- the RH ceiling from
+    # earlier is now a target, not a guarantee.
+    geometry = _geometry()
+    control = _control()
     chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
     model = GreenhouseClimateModel(geometry, chp, control)
 
@@ -245,5 +266,5 @@ def test_active_dehumidification_caps_relative_humidity_at_setpoint():
     saturated_state = ClimateState(temp_in_c=20.0, co2_in_ppm=420.0, vapor_pressure_kpa=2.3)
     result = model.step(saturated_state, hour=2, temp_out_c=18.0, solar_rad_w_m2=0.0, dt_hours=1.0, rh_out_pct=95.0)
 
-    assert result.rh_in_pct <= control.dehumidification_setpoint_pct + 0.01
-    assert result.dehumidified_kg > 0.0
+    assert result.dehumidified_kg == pytest.approx(control.dehumidification_capacity_kg_water_per_hour, rel=1e-6)
+    assert result.rh_in_pct > control.dehumidification_setpoint_pct + 0.01
