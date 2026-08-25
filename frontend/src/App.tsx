@@ -250,6 +250,7 @@ function App() {
         [
           { key: "dehumidification_elec_kw", name: "Αφύγρανση", color: "var(--energy)" },
           { key: "ventilation_elec_kw", name: "Αερισμός/fan-pad", color: "var(--series-2)" },
+          { key: "recirculation_elec_kw", name: "Ανακυκλοφορία", color: "var(--series-1)" },
         ],
         isCompare,
       )}
@@ -465,6 +466,10 @@ function App() {
                   <div className="spec-row">
                     <dt>Fan-pad ψύξη</dt>
                     <dd>{config.climate_control.fan_pad_cooling_enabled ? "Ενεργή" : "Ανενεργή"}</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>Ανεμιστήρες ανακυκλοφορίας</dt>
+                    <dd>~35 × ACF21 ({config.climate_control.recirculation_fan_power_kw} kW)</dd>
                   </div>
                 </dl>
               </>
@@ -869,6 +874,7 @@ const COMPARE_KEYS: (keyof DailyPoint)[] = [
   "fan_pad_active_hours",
   "dehumidification_elec_kw",
   "ventilation_elec_kw",
+  "recirculation_elec_kw",
 ];
 
 function mergeForCompare(current: DailyPoint[], baseline: DailyPoint[]): Record<string, number>[] {
@@ -973,6 +979,7 @@ function downloadCsv(result: SimulationResult) {
     "fan_pad_active_hours",
     "dehumidification_elec_kw",
     "ventilation_elec_kw",
+    "recirculation_elec_kw",
   ] as const;
   const rows = result.daily_series.map((d) => headers.map((h) => d[h]).join(","));
   const csv = [headers.join(","), ...rows].join("\n");

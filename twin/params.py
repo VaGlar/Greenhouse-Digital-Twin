@@ -161,6 +161,17 @@ class ClimateControlParams:
     # with Efficient Fan Choices" (https://www.vostermans.com/ventilation/blog/how-can-i-save-energy-in-a-greenhouse).
     # See docs/papers/greenhouse-electricity-consumption.md.
     ventilation_specific_fan_power_w_per_m3h: float = 0.03
+    # PLACEHOLDER: combined electrical power of this greenhouse's horizontal-airflow (HAF)
+    # recirculation fan bank (the vendor quote's ACF21 units, 508mm/20", 5,400 m3/h each --
+    # a real "air recirculation" cost line item, but no fan count or unit spec). Estimated
+    # from the quote's own geometry: one row of fans per bay (5 bays, matching the quote's
+    # own racetrack fan-layout diagram) x ~7 fans/row (100m length / ~14m real-world HAF
+    # spacing guidance, "one fan every 40-50 ft") = 35 fans x 5,400 m3/h x an assumed
+    # 0.025 W/(m3/h) specific power (real 20" HAF fans run ~0.017-0.04 W/(m3/h), similar
+    # efficiency range to exhaust fans but slightly better since HAF works against much
+    # lower static pressure) ~= 4.7 kW total when running. Not a real fan count/spec for
+    # this installation. See docs/papers/greenhouse-electricity-consumption.md.
+    recirculation_fan_power_kw: float = 4.7
 
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
@@ -193,6 +204,8 @@ class ClimateControlParams:
             raise ValueError("dehumidification_specific_power_kwh_per_kg must be > 0")
         if self.ventilation_specific_fan_power_w_per_m3h <= 0:
             raise ValueError("ventilation_specific_fan_power_w_per_m3h must be > 0")
+        if self.recirculation_fan_power_kw <= 0:
+            raise ValueError("recirculation_fan_power_kw must be > 0")
 
     def is_daytime(self, hour: int) -> bool:
         return self.day_start_hour <= hour < self.day_end_hour

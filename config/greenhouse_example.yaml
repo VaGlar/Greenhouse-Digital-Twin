@@ -57,6 +57,10 @@ climate_control:
   ventilation_specific_fan_power_w_per_m3h: 0.03    # SOURCED: mid-range of real greenhouse
                                      # ventilation fans (0.025-0.045 W per m3/h), see
                                      # docs/assumptions/economics.md
+  recirculation_fan_power_kw: 4.7  # PLACEHOLDER: 35 ACF21 recirculation fans (estimated from
+                                     # the quote's own geometry + real HAF spacing guidance,
+                                     # not a real fan count) x specific fan power, see
+                                     # docs/assumptions/economics.md
 
 crop:
   variety: "Beefsteak tomato"      # site-specific placeholder

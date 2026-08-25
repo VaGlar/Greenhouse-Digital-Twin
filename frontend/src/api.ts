@@ -39,6 +39,7 @@ export interface GreenhouseConfig {
     screen_energy_saving_fraction: number;
     dehumidification_setpoint_pct: number;
     fan_pad_cooling_enabled: boolean;
+    recirculation_fan_power_kw: number;
     [key: string]: unknown;
   };
   weather: { source: string; latitude_deg: number; [key: string]: unknown };
@@ -66,6 +67,8 @@ export interface DailyPoint {
   dehumidification_elec_kw: number;
   /** Daily-average electric power (kW) drawn by the fan-pad system's forced-air fans. */
   ventilation_elec_kw: number;
+  /** Daily-average electric power (kW) drawn by the recirculation (HAF) fan bank. */
+  recirculation_elec_kw: number;
 }
 
 export interface SimulationResult {
@@ -82,6 +85,7 @@ export interface SimulationResult {
     fan_pad_active_pct: number;
     total_dehumidification_elec_kwh: number;
     total_ventilation_elec_kwh: number;
+    total_recirculation_elec_kwh: number;
     total_electricity_kwh: number;
     co2_ambient_ppm: number;
     max_co2_available_ppm: number;
