@@ -53,6 +53,24 @@ T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 27.0, 35.0  # SOURCED: T_OPT raised from 24C t
 # 10.3389/fpls.2017.00365; researchgate 323225604 review. T_MIN left unchanged (not part of this pass).
 MAINTENANCE_RESPIRATION_FRACTION_PER_DAY = 0.015  # PLACEHOLDER, plausible order of magnitude — not individually sourced
 
+# Fruit-set temperature sensitivity -- SOURCED, added 2026-08-25. Deliberately separate from
+# and much narrower than T_MIN_C/T_OPT_C/T_MAX_C above: those describe photosynthesis, which
+# tomato leaves tolerate over a wide range (retaining 50% of rate even at 47C). Pollen viability
+# and pollen tube growth -- what actually determines whether a flower becomes a fruit -- are far
+# more temperature-sensitive: below ~55F (12.8C) promotes blossom drop and poor pollen vigor;
+# ideal fruit set sits in a narrow 60-70F (15.6-21.1C) window; above ~75F (24C) interferes with
+# pollen tube growth and causes blossom drop. See papers/tomato-fruit-set-temperature-sensitivity.md.
+FRUIT_SET_T_MIN_C, FRUIT_SET_T_OPT_C, FRUIT_SET_T_MAX_C = 12.0, 18.0, 24.0
+# PLACEHOLDER: half-life (hours) of the temperature EMA that _fruit_set_temp_response is
+# evaluated against, instead of the instantaneous hourly temp_in_c. Without this, a cold
+# night has literally zero effect on fruit-set quality in this model -- net dry matter is
+# never positive at night (no light), so a fruit-set penalty gated on "hours with positive
+# growth" only ever sees daytime temperature, no matter how cold the preceding night was.
+# 12h is an engineering choice representing the rough timescale over which flower/pollen-tube
+# development integrates recent conditions (not an instantaneous snapshot) -- not calibrated
+# to a specific study.
+FRUIT_SET_TEMP_EMA_HALF_LIFE_HOURS = 12.0
+
 # Canopy transpiration (drives the climate model's humidity balance).
 CANOPY_LIGHT_EXTINCTION_COEFF = 0.75  # SOURCED: Beer-Lambert k for high-wire tomato canopies, reported 0.7-0.9
 # (general canopy light-interception literature; see docs/assumptions/crop-model.md)
@@ -83,6 +101,11 @@ class CropState:
     # doesn't depend on standing biomass. Any future net-positive growth now repays
     # this deficit first, before anything is partitioned to fruit.
     respiration_deficit_g_m2: float = 0.0
+    # Exponential moving average of temp_in_c (see FRUIT_SET_TEMP_EMA_HALF_LIFE_HOURS) --
+    # fruit set depends on recent flower/pollen-tube development, not an instantaneous
+    # temperature snapshot, so a cold night needs to carry forward into the following
+    # day's fruit-set quality rather than being invisible once daytime growth resumes.
+    recent_temp_ema_c: float = 20.0
 
 
 @dataclass
@@ -108,6 +131,26 @@ def _temperature_response(temp_c: float) -> float:
     num = (temp_c - T_MIN_C) * (T_MAX_C - temp_c)
     den = (T_OPT_C - T_MIN_C) * (T_MAX_C - T_OPT_C)
     return min(1.0, max(0.0, (num / den)))
+
+
+def _fruit_set_temp_response(temp_c: float) -> float:
+    """Bell-shaped response, 0 outside [FRUIT_SET_T_MIN, FRUIT_SET_T_MAX], 1 at
+    FRUIT_SET_T_OPT -- same normalized-product-function shape as
+    _temperature_response, but far narrower: pollen viability and fruit set are much
+    more temperature-sensitive than photosynthesis itself (see module constants).
+
+    Added 2026-08-25: closes a gap the user found by testing extreme night setpoints
+    -- with only _temperature_response (which barely penalizes cold, since it's
+    calibrated for photosynthesis's wide tolerance) driving respiration, colder
+    nights always looked *better* for yield with no floor, all the way down to 5C.
+    Real tomato fruit set fails at both ends of a much narrower window than
+    photosynthesis tolerates; this response multiplies the fruit partition fraction
+    directly so an unrealistically cold (or hot) night now costs real yield."""
+    if temp_c <= FRUIT_SET_T_MIN_C or temp_c >= FRUIT_SET_T_MAX_C:
+        return 0.0
+    num = (temp_c - FRUIT_SET_T_MIN_C) * (FRUIT_SET_T_MAX_C - temp_c)
+    den = (FRUIT_SET_T_OPT_C - FRUIT_SET_T_MIN_C) * (FRUIT_SET_T_MAX_C - FRUIT_SET_T_OPT_C)
+    return min(1.0, max(0.0, num / den))
 
 
 def _canopy_light_response(solar_rad_w_m2: float, lai: float) -> float:
@@ -277,13 +320,25 @@ class TomatoCropModel:
             growth_after_deficit_g_m2 = net_dry_matter_g_m2_hour - repayment
 
         fruit_fraction = _fruit_partition_fraction(self.params, state.days_after_planting)
-        fruit_dm_increment = growth_after_deficit_g_m2 * fruit_fraction
+        # Fruit set (not photosynthesis) is the temperature-sensitive step here -- see
+        # _fruit_set_temp_response. Evaluated against a temperature EMA, not the
+        # instantaneous temp_in_c: net growth (and therefore any fruit credit) is only
+        # ever positive during daylight, so gating this purely on the current hour's
+        # temperature would make a cold *night* invisible to fruit set entirely --
+        # the EMA lets a cold night's chill carry forward into the following day's
+        # fruit-set quality, matching how flower/pollen-tube development actually
+        # integrates recent conditions rather than an instant snapshot.
+        ema_alpha = 1.0 - math.exp(-dt_hours * math.log(2) / FRUIT_SET_TEMP_EMA_HALF_LIFE_HOURS)
+        new_temp_ema_c = state.recent_temp_ema_c + ema_alpha * (temp_in_c - state.recent_temp_ema_c)
+        f_fruit_set = _fruit_set_temp_response(new_temp_ema_c)
+        fruit_dm_increment = growth_after_deficit_g_m2 * fruit_fraction * f_fruit_set
 
         new_fruit_dm = state.fruit_dry_matter_g_m2 + fruit_dm_increment
         new_fruit_fresh_yield_kg_m2 = new_fruit_dm / self.params.dry_matter_content_fruit / 1000.0
 
         new_state = CropState(
             days_after_planting=state.days_after_planting + dt_hours / 24.0,
+            recent_temp_ema_c=new_temp_ema_c,
             leaf_area_index=lai,
             standing_dry_matter_g_m2=new_standing_dm,
             fruit_dry_matter_g_m2=new_fruit_dm,

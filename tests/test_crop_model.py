@@ -4,6 +4,7 @@ from twin.crop_model import (
     CropState,
     TomatoCropModel,
     _canopy_light_response,
+    _fruit_set_temp_response,
     _lai,
     _temperature_response,
     _vpd_response,
@@ -218,6 +219,46 @@ def test_warmer_nights_no_longer_increase_seasonal_yield():
     warm_night_yield = run_cycle(night_temp_c=27.0)  # T_OPT_C -- maximizes respiration rate
 
     assert warm_night_yield < cool_night_yield
+
+
+def test_fruit_set_temp_response_zero_below_chilling_threshold():
+    assert _fruit_set_temp_response(12.0) == 0.0
+    assert _fruit_set_temp_response(5.0) == 0.0
+
+
+def test_fruit_set_temp_response_zero_above_heat_threshold():
+    assert _fruit_set_temp_response(24.0) == 0.0
+    assert _fruit_set_temp_response(30.0) == 0.0
+
+
+def test_fruit_set_temp_response_peaks_within_optimal_window():
+    assert _fruit_set_temp_response(18.0) == 1.0
+    assert _fruit_set_temp_response(18.0) > _fruit_set_temp_response(13.0)
+    assert _fruit_set_temp_response(18.0) > _fruit_set_temp_response(23.0)
+
+
+def test_a_persistently_cold_night_now_reduces_fruit_credit_the_following_day():
+    # Regression for the follow-up bug the user caught: after the respiration-deficit
+    # fix, yield still rose *without limit* as the night setpoint dropped all the way
+    # to 5C, because a fruit-set penalty gated on "hours with positive net growth"
+    # never sees night temperature at all (net growth is never positive at night --
+    # no light). The temperature EMA (recent_temp_ema_c) is what lets a cold night
+    # carry forward into the following day's fruit-set quality.
+    params = _crop_params(fruiting_start_days=0.0, fruiting_ramp_days=0.0001)
+
+    def run_cycle(night_temp_c: float) -> float:
+        model = TomatoCropModel(params, ground_area_m2=5000)
+        state = CropState(days_after_planting=40.0, standing_dry_matter_g_m2=400.0)
+        for _ in range(10):
+            for hour_temp, solar in [(night_temp_c, 0.0)] * 12 + [(20.0, 500.0)] * 12:
+                result = model.step(state, temp_in_c=hour_temp, co2_in_ppm=700.0, solar_rad_w_m2=solar, dt_hours=1.0)
+                state = result.state
+        return state.fruit_fresh_yield_kg_m2
+
+    mild_night_yield = run_cycle(night_temp_c=17.0)
+    extreme_cold_night_yield = run_cycle(night_temp_c=3.0)
+
+    assert extreme_cold_night_yield < mild_night_yield
 
 
 def test_canopy_assimilation_now_tracks_light_more_than_before_the_self_shading_fix():
