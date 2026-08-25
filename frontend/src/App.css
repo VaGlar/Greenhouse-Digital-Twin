@@ -509,6 +509,10 @@ body {
   background: var(--surface-2);
 }
 
+.jump-to-charts {
+  width: fit-content;
+}
+
 .error {
   color: #d03b3b;
   font-size: 0.8rem;

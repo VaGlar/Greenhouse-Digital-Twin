@@ -191,7 +191,10 @@ function App() {
   }
 
   const latestDay = result?.daily_series.at(-1) ?? null;
-  const showSchematic = activeTab !== "charts";
+  const showSchematic = activeTab === "chp";
+  const meanIndoorTempC = result
+    ? result.daily_series.reduce((sum, d) => sum + d.temp_in_c, 0) / result.daily_series.length
+    : null;
   const isCompare = Boolean(result && baselineResult);
   const chartData = result ? (baselineResult ? mergeForCompare(result.daily_series, baselineResult.daily_series) : result.daily_series) : [];
   const xKey = isCompare ? "day" : "date";
@@ -394,7 +397,7 @@ function App() {
                 ))}
                 <p className="side-note">
                   ⓘ Θερμοκουρτίνα &amp; fan-pad: πλήρως αυτόματα (νύχτα/ζέστη/κρύο) — δες την
-                  ένδειξη στο σχηματικό.
+                  ένδειξή τους στο tab «Θερμοκήπιο».
                 </p>
                 <dl className="spec-list">
                   <div className="spec-row">
@@ -521,6 +524,52 @@ function App() {
                 value={`${result.summary.heat_loss_avoided_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`}
               />
             </section>
+          )}
+
+          {activeTab === "recipe" && (
+            <p className="side-note">
+              Η συνταγή γεωπονίας δεν επηρεάζει ακόμα την προσομοίωση, οπότε δεν υπάρχουν
+              αποτελέσματα να δείξουμε εδώ.
+            </p>
+          )}
+
+          {activeTab === "crop" && (
+            <>
+              {result ? (
+                <section className="stat-row">
+                  <StatTile label="Τελικό yield" value={`${result.summary.final_yield_kg_m2.toFixed(2)} kg/m²`} />
+                  <StatTile
+                    label="Συνολική παραγωγή"
+                    value={`${result.summary.total_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
+                  />
+                </section>
+              ) : (
+                <p className="side-note">Τρέξε μια προσομοίωση για να δεις αποτελέσματα καλλιέργειας.</p>
+              )}
+              <button className="secondary-button jump-to-charts" onClick={() => setActiveTab("charts")}>
+                📈 Δες πλήρη διαγράμματα
+              </button>
+            </>
+          )}
+
+          {activeTab === "weather" && (
+            <>
+              {result && meanIndoorTempC !== null ? (
+                <section className="stat-row">
+                  <StatTile label="Μέση εσωτερική θερμοκρασία" value={`${meanIndoorTempC.toFixed(1)}°C`} />
+                  <StatTile
+                    label="Θερμική κατανάλωση"
+                    value={`${result.summary.total_heat_used_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`}
+                  />
+                  <StatTile label="Κουρτίνα κλειστή" value={`${result.summary.screen_deployed_pct.toFixed(0)}%`} />
+                </section>
+              ) : (
+                <p className="side-note">Τρέξε μια προσομοίωση για να δεις τα αποτελέσματα κλίματος.</p>
+              )}
+              <button className="secondary-button jump-to-charts" onClick={() => setActiveTab("charts")}>
+                📈 Δες πλήρη διαγράμματα
+              </button>
+            </>
           )}
 
           {activeTab === "charts" && result && (
