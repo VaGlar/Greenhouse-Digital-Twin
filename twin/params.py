@@ -89,7 +89,7 @@ class ClimateControlParams:
     # SOURCED: fraction cut from BOTH transmission heat loss and solar gain when the thermal
     # screen is deployed -- real product spec (Ludvig Svensson-style PH55, "55% shading, ~55%
     # energy saving") from a real vendor quote for this greenhouse: same fabric, same ~55% figure
-    # for both effects. See papers/geothermiki-s192g-quote.md. Deployment itself is fully
+    # for both effects. See docs/papers/geothermiki-s192g-quote.md. Deployment itself is fully
     # automatic (twin/climate_model.py: GreenhouseClimateModel._screen_should_deploy) -- not a
     # user-adjustable schedule; see climate-control.md for the 3-criteria control logic.
     screen_energy_saving_fraction: float = 0.55
@@ -117,7 +117,7 @@ class ClimateControlParams:
     # evaporative cooling system? When enabled, air drawn in by active ventilation is
     # first pre-cooled (and humidified) by passing through wet pads before entering the
     # greenhouse, letting ventilation cool below the raw outdoor dry-bulb temperature.
-    # See docs/assumptions/climate-control.md and papers/geothermiki-s192g-quote.md (the
+    # See docs/assumptions/climate-control.md and docs/papers/geothermiki-s192g-quote.md (the
     # vendor quote's "cooling panels").
     fan_pad_cooling_enabled: bool = False
     # SOURCED: fraction of the way from outdoor dry-bulb conditions to saturation at the

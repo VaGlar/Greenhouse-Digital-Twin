@@ -44,10 +44,10 @@ CO2_LAI_BOOST_MAX = 0.2688  # SOURCED: CO2 enrichment's real yield gain comes mo
 # vs ambient (compounds over the season: more canopy -> more total assimilation every subsequent
 # hour). This is the season-long "compounding" channel the instantaneous CO2_HALF_SAT_PPM factor
 # above structurally cannot capture on its own. See docs/assumptions/crop-model.md and
-# papers/co2-lai-growth-boost.md.
+# docs/papers/co2-lai-growth-boost.md.
 CO2_SATURATION_PPM = 700.0  # SOURCED: tomato study testing 500/700/850/1000 ppm found 700ppm optimal,
 # no further yield benefit above it -- response plateaus here instead of rising indefinitely.
-# See docs/assumptions/crop-model.md and papers/tomato-co2-optimum-700ppm.md
+# See docs/assumptions/crop-model.md and docs/papers/tomato-co2-optimum-700ppm.md
 T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 27.0, 35.0  # SOURCED: T_OPT raised from 24C to 27C to match photosynthesis-
 # specific studies reporting optimum 25-35C (tomato retains 50% of photosynthetic rate even at 47C) — Frontiers
 # 10.3389/fpls.2017.00365; researchgate 323225604 review. T_MIN left unchanged (not part of this pass).
@@ -59,7 +59,7 @@ MAINTENANCE_RESPIRATION_FRACTION_PER_DAY = 0.015  # PLACEHOLDER, plausible order
 # and pollen tube growth -- what actually determines whether a flower becomes a fruit -- are far
 # more temperature-sensitive: below ~55F (12.8C) promotes blossom drop and poor pollen vigor;
 # ideal fruit set sits in a narrow 60-70F (15.6-21.1C) window; above ~75F (24C) interferes with
-# pollen tube growth and causes blossom drop. See papers/tomato-fruit-set-temperature-sensitivity.md.
+# pollen tube growth and causes blossom drop. See docs/papers/tomato-fruit-set-temperature-sensitivity.md.
 FRUIT_SET_T_MIN_C, FRUIT_SET_T_OPT_C, FRUIT_SET_T_MAX_C = 12.0, 18.0, 24.0
 # PLACEHOLDER: half-life (hours) of the temperature EMA that _fruit_set_temp_response is
 # evaluated against, instead of the instantaneous hourly temp_in_c. Without this, a cold
