@@ -140,9 +140,54 @@ placeholder-grade engineering choice, not a calibrated one. 3 new regression tes
 (`tests/test_crop_model.py`) cover deficit accumulation, deficit-gates-fruit-credit, and the
 corrected warmer-nights-reduce-yield direction directly.
 
+## Bug fix: cold nights had no floor either (2026-08-25, same day)
+
+The previous fix corrected the *direction* for warm nights, but the user immediately caught the
+other half: sweeping the full night-setpoint range showed yield still climbing *without limit* as
+the setpoint dropped all the way to 5°C (8.137 kg/m² at 5°C > 6.466 kg/m² at the literature-optimal
+17°C) — real tomato night-temperature optima are a genuine bell curve (too cold hurts as much as
+too warm), not "colder is always better below the warm-side penalty."
+
+Root cause: nothing in the model penalized cold specifically — `_temperature_response`
+(T_MIN=10, T_OPT=27, T_MAX=35) is calibrated for *photosynthesis*, which tomato leaves tolerate
+over a wide range, so it barely penalizes cold nights near its floor. Fruit set (whether a flower
+actually becomes a fruit) is far more temperature-sensitive than photosynthesis — pollen viability
+and pollen-tube growth fail in a much narrower window — but nothing in the model captured that
+distinct mechanism.
+
+Added `_fruit_set_temp_response` (`FRUIT_SET_T_MIN_C=12, FRUIT_SET_T_OPT_C=18, FRUIT_SET_T_MAX_C=24`
+— SOURCED, see `papers/tomato-fruit-set-temperature-sensitivity.md`): below ~55°F (12.8°C)
+promotes blossom drop and poor pollen vigor; ideal fruit set sits in a narrow 60-70°F
+(15.6-21.1°C) window; above ~75°F (24°C) interferes with pollen-tube growth. This multiplies the
+fruit partition fraction directly.
+
+**First attempt didn't work**: gating this on the *current hour's* temperature has no effect at
+night at all, because net dry matter is never positive at night (zero light, zero gross
+assimilation) — so no fruit credit is ever computed at night regardless of how cold it is; the
+penalty only ever saw daytime temperature (a fixed 20°C in the sweep), completely missing the
+night-setpoint being swept. Fixed by evaluating `_fruit_set_temp_response` against
+`CropState.recent_temp_ema_c`, an exponential moving average of `temp_in_c` (half-life
+`FRUIT_SET_TEMP_EMA_HALF_LIFE_HOURS=12h`, PLACEHOLDER engineering choice representing roughly how
+long flower/pollen-tube development integrates recent conditions) instead of the instantaneous
+hourly value — this lets a cold night's chill carry forward and reduce the *following day's*
+fruit-set credit, matching the real physiological narrative.
+
+**Impact**: the night-setpoint sweep now shows a genuine peak instead of a monotonic slope: 5°C →
+7.030, 8°C → 7.570, 10°C → 7.858, **12°C → 7.947 (peak)**, 14°C → 7.325, 17°C → 6.206, 20°C →
+5.258, 28°C → 2.482, 33°C → 0.224 kg/m² (150-day run). Going colder now genuinely costs yield, not
+just warmer. **Caveat, not fully resolved**: the peak lands at 12°C, not the 17-18°C the
+literature (and this project's own `heating_setpoint_night_c`) cites — because the
+respiration-deficit mechanism (previous fix, same day) still rewards cooler nights via less
+biomass burned, partially offsetting this fruit-set penalty's pull toward 18°C. The two mechanisms
+are pulling toward different optima and nothing here reconciles them precisely; doing so with
+confidence would need real sensor/yield data this greenhouse doesn't have yet, not just further
+parameter guessing. Flagged here rather than silently left implicit. 4 new regression tests
+(`tests/test_crop_model.py`) cover the response curve's cardinal points directly and the
+EMA-carries-cold-forward behavior at the `TomatoCropModel.step` level.
+
 ## Bottom line
 
-The **structure** of the crop model (light/CO2/temperature/VPD response curves feeding canopy photosynthesis, minus maintenance respiration, partitioned to fruit by growth stage, with CO2 also boosting LAI growth) is a legitimate simplified version of how real crop models like TOMGRO work. Most of the **numbers** are literature-plausible but not individually calibrated to this greenhouse. Baseline 150-day yield at the default config has moved several times as these corrections landed: 13.30 (start) → 20.25 (`fruit_partition_fraction_max`/`T_OPT_C` raised, 2026-08-19) → 20.96 (thermal screen + respiration bug fix, 2026-08-20) → 15.49 (RH setpoint corrected to the literature value, 2026-08-20) → 15.64 (CO2 response capped + half-saturation corrected + CO2→LAI growth channel added, 2026-08-20) → 32.70 (real weather + ventilation-overshoot fix + fan-pad cooling enabled, 2026-08-25) → 13.38 (canopy self-shading fix, 2026-08-25) → **6.47** (nighttime respiration deficit fix, 2026-08-25 — see below). Each step is documented above with its own rationale — treat the current number as "internally more consistent than before," not as a validated absolute prediction; that still requires this greenhouse's own sensor/yield data.
+The **structure** of the crop model (light/CO2/temperature/VPD response curves feeding canopy photosynthesis, minus maintenance respiration, partitioned to fruit by growth stage, with CO2 also boosting LAI growth) is a legitimate simplified version of how real crop models like TOMGRO work. Most of the **numbers** are literature-plausible but not individually calibrated to this greenhouse. Baseline 150-day yield at the default config has moved several times as these corrections landed: 13.30 (start) → 20.25 (`fruit_partition_fraction_max`/`T_OPT_C` raised, 2026-08-19) → 20.96 (thermal screen + respiration bug fix, 2026-08-20) → 15.49 (RH setpoint corrected to the literature value, 2026-08-20) → 15.64 (CO2 response capped + half-saturation corrected + CO2→LAI growth channel added, 2026-08-20) → 32.70 (real weather + ventilation-overshoot fix + fan-pad cooling enabled, 2026-08-25) → 13.38 (canopy self-shading fix, 2026-08-25) → 6.47 (nighttime respiration deficit fix, 2026-08-25) → **6.21** (fruit-set temperature sensitivity added, 2026-08-25 — see below). Each step is documented above with its own rationale — treat the current number as "internally more consistent than before," not as a validated absolute prediction; that still requires this greenhouse's own sensor/yield data.
 
 ## Bug fix: nighttime respiration was a no-op (2026-08-20)
 
