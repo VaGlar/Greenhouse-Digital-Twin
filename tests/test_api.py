@@ -7,6 +7,7 @@ test_climate_model.py / test_crop_model.py / test_weather.py, not here.
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -63,6 +64,9 @@ def test_simulate_response_has_expected_summary_fields():
         "heat_loss_avoided_kwh",
         "screen_deployed_pct",
         "fan_pad_active_pct",
+        "total_dehumidification_elec_kwh",
+        "total_ventilation_elec_kwh",
+        "total_electricity_kwh",
         "co2_ambient_ppm",
         "max_co2_available_ppm",
     ):
@@ -84,6 +88,8 @@ def test_simulate_daily_series_rows_have_expected_fields():
         "heat_used_kw",
         "screen_closed_hours",
         "fan_pad_active_hours",
+        "dehumidification_elec_kw",
+        "ventilation_elec_kw",
     ):
         assert key in row
 
@@ -141,6 +147,27 @@ def test_simulate_rejects_non_integer_duration_days():
 def test_simulate_rejects_malformed_start_date():
     response = client.post("/simulate", json={"start_date": "not-a-date"})
     assert response.status_code == 422
+
+
+# -- electricity consumption summary fields --
+
+
+def test_total_electricity_kwh_is_sum_of_its_two_components():
+    body = client.post("/simulate", json={"duration_days": 5}).json()
+    summary = body["summary"]
+    assert summary["total_electricity_kwh"] == pytest.approx(
+        summary["total_dehumidification_elec_kwh"] + summary["total_ventilation_elec_kwh"]
+    )
+
+
+def test_stricter_dehumidification_setpoint_increases_its_electricity_use():
+    loose = client.post(
+        "/simulate", json={"duration_days": 10, "dehumidification_setpoint_pct": 85}
+    ).json()["summary"]
+    strict = client.post(
+        "/simulate", json={"duration_days": 10, "dehumidification_setpoint_pct": 60}
+    ).json()["summary"]
+    assert strict["total_dehumidification_elec_kwh"] > loose["total_dehumidification_elec_kwh"]
 
 
 # -- /weather_preview: lightweight preview for the weather tab, no climate/crop model --

@@ -141,6 +141,26 @@ class ClimateControlParams:
     # maintained systems generally. 0.80 is a representative value within that range. Only
     # used when fan_pad_cooling_enabled is True. See docs/assumptions/climate-control.md.
     fan_pad_efficiency: float = 0.80
+    # SOURCED: electrical energy per kg of water actually removed by the active
+    # dehumidification system -- 0.22 kWh/kg is the DryGair DG-12's own published
+    # efficiency spec (9.55 kW drawn, ~45 kg/hour removed -> ~4.5 kg/kWh -> ~0.22
+    # kWh/kg; https://drygair.com/dehumidifiers/dg-12-50hz-standard/). Reused here even
+    # though the DG-12's *capacity* was rejected as a scale mismatch for this greenhouse
+    # (see dehumidification_capacity_kg_water_per_hour above) -- kWh-per-kg is a property
+    # of the dehumidification technology (refrigerant-cycle moisture removal), not of the
+    # unit's physical size, so it transfers independently of that capacity issue. See
+    # docs/papers/greenhouse-electricity-consumption.md.
+    dehumidification_specific_power_kwh_per_kg: float = 0.22
+    # SOURCED: electrical power per unit of active (above-baseline) ventilation airflow,
+    # engaged only when fan_pad_cooling_enabled and ventilation is ramped above
+    # vent_min_ach -- passive roof-vent leakage at vent_min_ach is naturally driven
+    # (buoyancy/wind through motorized vents) and draws negligible power, so this only
+    # prices the fan-pad system's forced-air fans. 0.03 W per (m3/h) is the middle of a
+    # 0.025-0.045 W/(m3/h) range measured across real greenhouse ventilation fans (older
+    # vs. newer energy-efficient models); see Vostermans, "Save Energy in Your Greenhouse
+    # with Efficient Fan Choices" (https://www.vostermans.com/ventilation/blog/how-can-i-save-energy-in-a-greenhouse).
+    # See docs/papers/greenhouse-electricity-consumption.md.
+    ventilation_specific_fan_power_w_per_m3h: float = 0.03
 
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
@@ -169,6 +189,10 @@ class ClimateControlParams:
             raise ValueError("dehumidification_setpoint_pct must be in (0, 100]")
         if not 0 <= self.screen_energy_saving_fraction < 1:
             raise ValueError("screen_energy_saving_fraction must be in [0, 1)")
+        if self.dehumidification_specific_power_kwh_per_kg <= 0:
+            raise ValueError("dehumidification_specific_power_kwh_per_kg must be > 0")
+        if self.ventilation_specific_fan_power_w_per_m3h <= 0:
+            raise ValueError("ventilation_specific_fan_power_w_per_m3h must be > 0")
 
     def is_daytime(self, hour: int) -> bool:
         return self.day_start_hour <= hour < self.day_end_hour

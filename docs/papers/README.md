@@ -36,5 +36,6 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`tomato-fruit-set-temperature-sensitivity.md`](./tomato-fruit-set-temperature-sensitivity.md) | `FRUIT_SET_T_MIN_C`, `FRUIT_SET_T_OPT_C`, `FRUIT_SET_T_MAX_C` |
 | [`greenhouse-dehumidification-capacity.md`](./greenhouse-dehumidification-capacity.md) | `climate_control.dehumidification_capacity_kg_water_per_hour` |
 | [`tomato-crop-cycle-duration.md`](./tomato-crop-cycle-duration.md) | `simulation.duration_days` |
+| [`greenhouse-electricity-consumption.md`](./greenhouse-electricity-consumption.md) | `climate_control.dehumidification_specific_power_kwh_per_kg`, `climate_control.ventilation_specific_fan_power_w_per_m3h` |
 
 See [`docs/sources.xlsx`](../sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

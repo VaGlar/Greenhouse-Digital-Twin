@@ -52,6 +52,11 @@ climate_control:
                                      # evaporative cooling? Enabled for this greenhouse -- see docs/assumptions/climate-control.md
   fan_pad_efficiency: 0.80         # SOURCED: UF/IFAS Extension CIR1135/AE069, up to 85% for a well-maintained
                                      # system; only used when fan_pad_cooling_enabled is true
+  dehumidification_specific_power_kwh_per_kg: 0.22  # SOURCED: DryGair DG-12 published spec
+                                     # (9.55 kW / ~45 kg/hour), see docs/assumptions/economics.md
+  ventilation_specific_fan_power_w_per_m3h: 0.03    # SOURCED: mid-range of real greenhouse
+                                     # ventilation fans (0.025-0.045 W per m3/h), see
+                                     # docs/assumptions/economics.md
 
 crop:
   variety: "Beefsteak tomato"      # site-specific placeholder

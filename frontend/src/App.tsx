@@ -239,6 +239,23 @@ function App() {
       series={buildSeries([{ key: "screen_closed_hours", name: "Κλειστή", color: "var(--humidity)" }], isCompare)}
     />
   );
+  const electricityChart = (
+    <ComparableChart
+      title="Ηλεκτρική κατανάλωση θερμοκηπίου (μέση ισχύς/ώρα)"
+      subtitle="Αγορά από το δίκτυο — αερισμός/fan-pad + αφύγρανση. Δεν περιλαμβάνει τη θέρμανση (CHP) ή το CHP's δικό του ρεύμα, που πωλείται στο δίκτυο."
+      unit=" kW"
+      height={260}
+      data={chartData}
+      xKey={xKey}
+      series={buildSeries(
+        [
+          { key: "dehumidification_elec_kw", name: "Αφύγρανση", color: "var(--energy)" },
+          { key: "ventilation_elec_kw", name: "Αερισμός/fan-pad", color: "var(--series-1)" },
+        ],
+        isCompare,
+      )}
+    />
+  );
   const fanPadChart = (
     <ComparableChart
       title="Ώρες ενεργού fan-pad ψύξης/ημέρα"
@@ -609,6 +626,10 @@ function App() {
                 label="Εξοικονόμηση από κουρτίνα"
                 value={`${result.summary.heat_loss_avoided_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`}
               />
+              <StatTile
+                label="Ηλεκτρική κατανάλωση (δίκτυο)"
+                value={`${result.summary.total_electricity_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`}
+              />
             </section>
           )}
 
@@ -657,6 +678,7 @@ function App() {
                   <div className="chart-grid">
                     {tempChart}
                     {heatChart}
+                    {electricityChart}
                     {screenChart}
                     {fanPadChart}
                     {rhChart}
@@ -678,6 +700,7 @@ function App() {
             <div className="chart-grid">
               {tempChart}
               {heatChart}
+              {electricityChart}
               {screenChart}
               {fanPadChart}
               {rhChart}
@@ -845,6 +868,8 @@ const COMPARE_KEYS: (keyof DailyPoint)[] = [
   "heat_used_kw",
   "screen_closed_hours",
   "fan_pad_active_hours",
+  "dehumidification_elec_kw",
+  "ventilation_elec_kw",
 ];
 
 function mergeForCompare(current: DailyPoint[], baseline: DailyPoint[]): Record<string, number>[] {
@@ -947,6 +972,8 @@ function downloadCsv(result: SimulationResult) {
     "heat_used_kw",
     "screen_closed_hours",
     "fan_pad_active_hours",
+    "dehumidification_elec_kw",
+    "ventilation_elec_kw",
   ] as const;
   const rows = result.daily_series.map((d) => headers.map((h) => d[h]).join(","));
   const csv = [headers.join(","), ...rows].join("\n");
