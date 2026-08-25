@@ -117,28 +117,32 @@ via wasteful nighttime respiration was a pure win with no real cost. The warmer 
 closer `_temperature_response(night_temp)` sits to its peak (`T_OPT_C=27`), the more respiration
 burns per hour, the more "free" future respiration-tax reduction the model banked.
 
-Fixed by giving that loss a real consequence: `CropState.respiration_deficit_g_m2` accumulates
-whenever a hour's net dry matter is negative, and any future net-positive growth must repay that
-deficit in full *before* anything is partitioned to fruit (`TomatoCropModel.step`) — the modeling
-equivalent of a plant needing to rebuild what it burned before it can afford to set new fruit,
-rather than getting fruit credit and a smaller future respiration bill simultaneously from the
-same loss.
+**First attempt (reverted same day): a repayable deficit ledger.** `CropState.respiration_deficit_g_m2`
+accumulated whenever an hour's net dry matter was negative, and any future net-positive growth had
+to repay that deficit in full *before* anything was partitioned to fruit. This flipped the
+direction correctly (warmer nights → lower yield) but turned out to **double-charge** the loss: it
+was already reflected once, legitimately, in the reduced `standing_dry_matter_g_m2` that hour — the
+deficit ledger then charged the *same* loss a second time by blocking an equivalent amount of
+future fruit credit. Measured on the default 150-day run: total gross assimilation for the season
+was ~1505 g/m², of which ~480 g/m² (32%) was net-negative-hour respiration that then got diverted a
+*second* time into deficit repayment instead of the normal 85%-to-fruit split. Default yield
+collapsed from 13.38 → 6.47 kg/m² — correct direction, but for the wrong reason and by too much.
 
-**Impact:** re-ran the night-setpoint sweep — direction is now correct (warmer nights reduce
-yield: 10°C → 8.126 kg/m², 20-28°C plateau → 6.013 kg/m², 33°C → 6.894 kg/m², a proper valley
-around the respiration-rate peak instead of a peak there). Default 150-day config yield dropped
-from 13.38 → **6.47 kg/m²** — a large absolute drop, because the fix doesn't just change the
-*direction* of the night-setpoint effect, it also makes nightly respiration losses (which happen
-*every* night, not just in the sweep) cost real, ongoing fruit credit for the first time, where
-before they were fully absorbed for free. This is a real, substantial known limitation worth
-flagging explicitly: "repay the full deficit before any fruit credit" is a simple, defensible
-engineering choice (not individually sourced to a specific TOMGRO-style carbon-partitioning
-study), and a real plant likely balances vegetative recovery and reproductive investment more
-continuously/gradually rather than fully sequentially — this fix corrects the *sign* of the
-night-temperature effect (the immediate bug) but the exact severity of the penalty is a
-placeholder-grade engineering choice, not a calibrated one. 3 new regression tests
-(`tests/test_crop_model.py`) cover deficit accumulation, deficit-gates-fruit-credit, and the
-corrected warmer-nights-reduce-yield direction directly.
+**Fixed properly: `CropState.respiration_reference_g_m2`, a running high-water mark.** Instead of
+charging respiration against the current (freely shrinkable) `standing_dry_matter_g_m2`, it's now
+charged against `respiration_reference_g_m2 = max(previous reference, current standing biomass)` —
+a value that only ever grows. A bad night still costs real biomass exactly once (reflected in
+`standing_dry_matter_g_m2`, same as always), but no longer *also* discounts every future hour's
+respiration bill — closing the exploit without charging the same loss twice, and without gating
+fruit credit behind a repayment queue at all (fruit partitioning reverts to the original, simple
+"credit `fruit_fraction` of whatever net growth this hour had" — see the fruit-set section below
+for the one addition on top of that).
+
+**Impact:** night-setpoint sweep direction is correct (10°C → 11.951, 17°C → 13.058, 33°C → near
+zero, a proper valley on the warm side) *and* the magnitude stays close to the pre-respiration-fix
+baseline (13.38 kg/m², 150-day default config) rather than collapsing. 2 regression tests
+(`tests/test_crop_model.py`) cover the high-water mark not shrinking with standing biomass, and a
+second consecutive bad night costing the *same* respiration as the first (not a discounted one).
 
 ## Bug fix: cold nights had no floor either (2026-08-25, same day)
 
@@ -172,22 +176,22 @@ long flower/pollen-tube development integrates recent conditions) instead of the
 hourly value — this lets a cold night's chill carry forward and reduce the *following day's*
 fruit-set credit, matching the real physiological narrative.
 
-**Impact**: the night-setpoint sweep now shows a genuine peak instead of a monotonic slope: 5°C →
-7.030, 8°C → 7.570, 10°C → 7.858, **12°C → 7.947 (peak)**, 14°C → 7.325, 17°C → 6.206, 20°C →
-5.258, 28°C → 2.482, 33°C → 0.224 kg/m² (150-day run). Going colder now genuinely costs yield, not
-just warmer. **Caveat, not fully resolved**: the peak lands at 12°C, not the 17-18°C the
-literature (and this project's own `heating_setpoint_night_c`) cites — because the
-respiration-deficit mechanism (previous fix, same day) still rewards cooler nights via less
-biomass burned, partially offsetting this fruit-set penalty's pull toward 18°C. The two mechanisms
-are pulling toward different optima and nothing here reconciles them precisely; doing so with
-confidence would need real sensor/yield data this greenhouse doesn't have yet, not just further
-parameter guessing. Flagged here rather than silently left implicit. 4 new regression tests
-(`tests/test_crop_model.py`) cover the response curve's cardinal points directly and the
-EMA-carries-cold-forward behavior at the `TomatoCropModel.step` level.
+**Impact (re-measured after the respiration-reference revision above)**: the night-setpoint sweep
+now shows a genuine peak in the right place: 5°C → 9.906, 8°C → 11.204, 10°C → 11.951, 12°C →
+12.530, 14°C → 12.980, **16°C → 13.120 (peak)**, **17°C → 13.058**, 18°C → 12.898, 20°C → 12.223
+kg/m² (150-day run, `heating_setpoint_day_c` capped at 20°C by an existing validation, so the
+warm-side tail above ~20°C wasn't re-swept here — the same 33°C → 0.224 kg/m² collapse from before
+still holds via `_fruit_set_temp_response` alone). The peak now lands at 16-17°C, matching this
+project's own SOURCED `heating_setpoint_night_c=17°C` almost exactly — the mismatch flagged in an
+earlier draft of this section (peak at 12°C, not 17-18°C) was itself downstream of the
+deficit-ledger double-counting bug above; once that was fixed properly, the two mechanisms stopped
+pulling toward different optima. 4 regression tests (`tests/test_crop_model.py`) cover the response
+curve's cardinal points directly and the EMA-carries-cold-forward behavior at the
+`TomatoCropModel.step` level.
 
 ## Bottom line
 
-The **structure** of the crop model (light/CO2/temperature/VPD response curves feeding canopy photosynthesis, minus maintenance respiration, partitioned to fruit by growth stage, with CO2 also boosting LAI growth) is a legitimate simplified version of how real crop models like TOMGRO work. Most of the **numbers** are literature-plausible but not individually calibrated to this greenhouse. Baseline 150-day yield at the default config has moved several times as these corrections landed: 13.30 (start) → 20.25 (`fruit_partition_fraction_max`/`T_OPT_C` raised, 2026-08-19) → 20.96 (thermal screen + respiration bug fix, 2026-08-20) → 15.49 (RH setpoint corrected to the literature value, 2026-08-20) → 15.64 (CO2 response capped + half-saturation corrected + CO2→LAI growth channel added, 2026-08-20) → 32.70 (real weather + ventilation-overshoot fix + fan-pad cooling enabled, 2026-08-25) → 13.38 (canopy self-shading fix, 2026-08-25) → 6.47 (nighttime respiration deficit fix, 2026-08-25) → **6.21** (fruit-set temperature sensitivity added, 2026-08-25 — see below). Each step is documented above with its own rationale — treat the current number as "internally more consistent than before," not as a validated absolute prediction; that still requires this greenhouse's own sensor/yield data.
+The **structure** of the crop model (light/CO2/temperature/VPD response curves feeding canopy photosynthesis, minus maintenance respiration, partitioned to fruit by growth stage, with CO2 also boosting LAI growth) is a legitimate simplified version of how real crop models like TOMGRO work. Most of the **numbers** are literature-plausible but not individually calibrated to this greenhouse. Baseline 150-day yield at the default config has moved several times as these corrections landed: 13.30 (start) → 20.25 (`fruit_partition_fraction_max`/`T_OPT_C` raised, 2026-08-19) → 20.96 (thermal screen + respiration bug fix, 2026-08-20) → 15.49 (RH setpoint corrected to the literature value, 2026-08-20) → 15.64 (CO2 response capped + half-saturation corrected + CO2→LAI growth channel added, 2026-08-20) → 32.70 (real weather + ventilation-overshoot fix + fan-pad cooling enabled, 2026-08-25) → 13.38 (canopy self-shading fix, 2026-08-25) → 6.47 (nighttime respiration deficit fix, reverted same day — double-counted the loss, see below) → 6.21 (fruit-set temperature sensitivity added on top of the double-counting bug, 2026-08-25) → **13.06** (respiration-reference revision replacing the deficit ledger, 2026-08-25 — see below). Each step is documented above with its own rationale — treat the current number as "internally more consistent than before," not as a validated absolute prediction; that still requires this greenhouse's own sensor/yield data.
 
 ## Bug fix: nighttime respiration was a no-op (2026-08-20)
 

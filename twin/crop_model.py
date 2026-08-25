@@ -94,13 +94,17 @@ class CropState:
     standing_dry_matter_g_m2: float = 5.0  # total plant dry matter per m2 ground area
     fruit_dry_matter_g_m2: float = 0.0
     fruit_fresh_yield_kg_m2: float = 0.0
-    # Cumulative unpaid respiration loss (g/m2) -- see _fruit_partition_fraction's
-    # caller in TomatoCropModel.step for why this exists: without it, hours where
-    # respiration exceeds assimilation (typically at night, when there's no light
-    # for photosynthesis at all) were a "free" loss with no consequence, since LAI
-    # doesn't depend on standing biomass. Any future net-positive growth now repays
-    # this deficit first, before anything is partitioned to fruit.
-    respiration_deficit_g_m2: float = 0.0
+    # Running maximum standing_dry_matter_g_m2 has ever reached (g/m2) -- see
+    # TomatoCropModel.step for why this exists: respiration is charged against this,
+    # not the current (freely shrinkable) standing_dry_matter_g_m2. Without it, a bad
+    # night's respiration loss reduced standing biomass with no other consequence --
+    # and since LAI doesn't depend on standing biomass, *smaller* biomass actually
+    # meant *less* future respiration to pay, with photosynthetic capacity completely
+    # unaffected. That made burning biomass via wasteful (warm) nighttime respiration
+    # a pure win: less biomass, therefore a permanently lower future respiration
+    # bill, for free. Charging respiration against the high-water mark instead means
+    # a bad night still costs real biomass, but doesn't also discount the future.
+    respiration_reference_g_m2: float = 5.0
     # Exponential moving average of temp_in_c (see FRUIT_SET_TEMP_EMA_HALF_LIFE_HOURS) --
     # fruit set depends on recent flower/pollen-tube development, not an instantaneous
     # temperature snapshot, so a cold night needs to carry forward into the following
@@ -277,11 +281,38 @@ class TomatoCropModel:
             gross_assimilation_kg_co2_m2_hour * 1000.0 * CO2_TO_DRY_MATTER_FACTOR
         )
 
-        # Maintenance respiration: proportional to standing biomass, scaled by
+        # Maintenance respiration: proportional to a *reference* biomass, scaled by
         # the same temperature response (warmer -> faster respiration), spread
         # evenly across the day rather than only during daylight.
+        #
+        # Bug fix 2026-08-25 (revised same day): the reference used to be the current
+        # standing_dry_matter_g_m2 directly. But standing biomass can shrink on a bad
+        # (net-negative) hour -- typically every night, since gross assimilation is
+        # zero with no light -- and since LAI doesn't depend on standing biomass at
+        # all, a smaller pool meant strictly *less* future respiration to pay, with
+        # photosynthetic capacity completely unaffected. That made burning biomass via
+        # wasteful (warm) nighttime respiration a pure win: real cost that hour, free
+        # discount on every future hour's respiration bill.
+        #
+        # First attempt at a fix used a separate "repay this deficit before any fruit
+        # credit" ledger -- it flipped the direction correctly but *also* double-
+        # charged the loss (once via the reduced standing_dry_matter_g_m2, which
+        # already is a real, legitimate consequence, and again by blocking future
+        # fruit credit for an equivalent amount) -- season-total respiration losses on
+        # net-negative hours were ~480 g/m2 out of ~1505 g/m2 total gross assimilation
+        # (150-day run), all of it diverted a second time away from fruit. Reverted.
+        #
+        # Fixed properly with `respiration_reference_g_m2`: a running high-water mark
+        # of standing_dry_matter_g_m2, which only ever grows, never shrinks with it.
+        # Respiration is charged against *this*, so a bad night still costs real
+        # biomass (reflected once, in new_standing_dm below) but no longer discounts
+        # any future respiration bill -- removing the exploit without charging the
+        # same loss twice. Matches how a real plant's actual structure (stems, roots,
+        # established leaf tissue) doesn't shrink from one night's negative carbon
+        # balance; senescence/abscission remains a separate, still-unmodeled process.
+        respiration_reference = max(state.respiration_reference_g_m2, state.standing_dry_matter_g_m2)
         respiration_g_m2_hour = (
-            state.standing_dry_matter_g_m2
+            respiration_reference
             * MAINTENANCE_RESPIRATION_FRACTION_PER_DAY
             / 24.0
             * max(f_temp, 0.3)
@@ -296,28 +327,7 @@ class TomatoCropModel:
         # discarded every hour's respiration loss entirely, silently making nighttime
         # temperature (and therefore the thermal screen) have zero effect on yield.
         new_standing_dm = max(0.0, state.standing_dry_matter_g_m2 + net_dry_matter_g_m2_hour)
-
-        # Bug fix 2026-08-25: a net-negative hour (respiration > assimilation --
-        # normally every night, since gross assimilation is zero with no light) used
-        # to just shrink standing biomass with no other consequence. Because LAI
-        # doesn't depend on standing biomass, that loss was actually a net *benefit*
-        # to future yield: less biomass left over means less future respiration to
-        # pay, with photosynthetic capacity completely unaffected -- so *warmer*
-        # nights (more wasteful respiration) were perversely raising yield, the
-        # opposite of the real, literature-documented effect (this greenhouse's own
-        # night setpoint is set to 17C specifically because warmer nights hurt
-        # tomato yield). Track unpaid respiration losses as a deficit that any
-        # future net-positive growth must repay in full before anything is
-        # partitioned to fruit -- the real-world equivalent of a plant needing to
-        # rebuild what it burned before it can afford to set new fruit.
-        new_deficit = state.respiration_deficit_g_m2
-        growth_after_deficit_g_m2 = 0.0
-        if net_dry_matter_g_m2_hour < 0:
-            new_deficit += -net_dry_matter_g_m2_hour
-        else:
-            repayment = min(net_dry_matter_g_m2_hour, new_deficit)
-            new_deficit -= repayment
-            growth_after_deficit_g_m2 = net_dry_matter_g_m2_hour - repayment
+        new_respiration_reference = max(respiration_reference, new_standing_dm)
 
         fruit_fraction = _fruit_partition_fraction(self.params, state.days_after_planting)
         # Fruit set (not photosynthesis) is the temperature-sensitive step here -- see
@@ -331,7 +341,8 @@ class TomatoCropModel:
         ema_alpha = 1.0 - math.exp(-dt_hours * math.log(2) / FRUIT_SET_TEMP_EMA_HALF_LIFE_HOURS)
         new_temp_ema_c = state.recent_temp_ema_c + ema_alpha * (temp_in_c - state.recent_temp_ema_c)
         f_fruit_set = _fruit_set_temp_response(new_temp_ema_c)
-        fruit_dm_increment = growth_after_deficit_g_m2 * fruit_fraction * f_fruit_set
+        new_growth_g_m2 = max(0.0, net_dry_matter_g_m2_hour)
+        fruit_dm_increment = new_growth_g_m2 * fruit_fraction * f_fruit_set
 
         new_fruit_dm = state.fruit_dry_matter_g_m2 + fruit_dm_increment
         new_fruit_fresh_yield_kg_m2 = new_fruit_dm / self.params.dry_matter_content_fruit / 1000.0
@@ -343,7 +354,7 @@ class TomatoCropModel:
             standing_dry_matter_g_m2=new_standing_dm,
             fruit_dry_matter_g_m2=new_fruit_dm,
             fruit_fresh_yield_kg_m2=new_fruit_fresh_yield_kg_m2,
-            respiration_deficit_g_m2=new_deficit,
+            respiration_reference_g_m2=new_respiration_reference,
         )
 
         # Canopy transpiration: fraction of solar radiation intercepted by the canopy
