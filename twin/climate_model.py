@@ -114,6 +114,7 @@ class ClimateStepResult:
     # deployed (0 if retracted) -- a direct physical quantity, not a counterfactual
     # second simulation. Used to report "energy saved by the screen" to the user.
     heat_loss_avoided_kw: float
+    fan_pad_active: bool
 
 
 class GreenhouseClimateModel:
@@ -278,7 +279,8 @@ class GreenhouseClimateModel:
         # real system runs its pads together with the exhaust fans, not during passive
         # leakage. When active, ventilation draws in pad-cooled (and pad-humidified) air
         # instead of raw outdoor air, for both the temperature and humidity balances below.
-        if self.control.fan_pad_cooling_enabled and ach > self.control.vent_min_ach:
+        fan_pad_active = self.control.fan_pad_cooling_enabled and ach > self.control.vent_min_ach
+        if fan_pad_active:
             temp_out_c_for_vent, vapor_out_kpa = self._fan_pad_outdoor_conditions(temp_out_c, rh_out_pct)
         else:
             temp_out_c_for_vent = temp_out_c
@@ -374,4 +376,5 @@ class GreenhouseClimateModel:
             dehumidified_kg=dehumidified_kg,
             screen_deployed=screen_deployed,
             heat_loss_avoided_kw=heat_loss_avoided_kw,
+            fan_pad_active=fan_pad_active,
         )

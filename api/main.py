@@ -165,12 +165,14 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 # so it's directly comparable to the CHP's fixed max heat output below.
                 "heat_used_kw": "mean",
                 "screen_deployed": "sum",  # hours deployed that day (timestep is hourly)
+                "fan_pad_active": "sum",  # hours engaged that day (timestep is hourly)
             }
         )
         .reset_index()
-        .rename(columns={"screen_deployed": "screen_closed_hours"})
+        .rename(columns={"screen_deployed": "screen_closed_hours", "fan_pad_active": "fan_pad_active_hours"})
     )
     daily["screen_closed_hours"] = daily["screen_closed_hours"] * params.simulation.timestep_hours
+    daily["fan_pad_active_hours"] = daily["fan_pad_active_hours"] * params.simulation.timestep_hours
     daily["co2_in_ppm"] = daily["timestamp"].dt.date.map(daytime_co2_by_day)
 
     final_yield_kg_m2 = float(results["fruit_fresh_yield_kg_m2"].iloc[-1])
@@ -181,6 +183,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
     total_heat_used_kwh = float(results["heat_used_kw"].sum() * params.simulation.timestep_hours)
     heat_loss_avoided_kwh = float(results["heat_loss_avoided_kw"].sum() * params.simulation.timestep_hours)
     screen_deployed_pct = float(results["screen_deployed"].mean() * 100.0)
+    fan_pad_active_pct = float(results["fan_pad_active"].mean() * 100.0)
     # Theoretical ceiling: the ppm the CHP's full hourly CO2 output would add on top of
     # ambient if every bit of it stayed in the greenhouse air for that hour (zero
     # ventilation loss) -- an upper bound on what "the machine can offer", not a realistic
@@ -200,6 +203,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "max_heat_available_kw": params.chp.heat_available_kw,
             "heat_loss_avoided_kwh": heat_loss_avoided_kwh,
             "screen_deployed_pct": screen_deployed_pct,
+            "fan_pad_active_pct": fan_pad_active_pct,
             "co2_ambient_ppm": params.climate_control.co2_ambient_ppm,
             "max_co2_available_ppm": max_co2_available_ppm,
         },
@@ -214,6 +218,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "fruit_fresh_yield_kg_m2": round(row.fruit_fresh_yield_kg_m2, 3),
                 "heat_used_kw": round(row.heat_used_kw, 1),
                 "screen_closed_hours": round(row.screen_closed_hours, 1),
+                "fan_pad_active_hours": round(row.fan_pad_active_hours, 1),
             }
             for row in daily.itertuples()
         ],

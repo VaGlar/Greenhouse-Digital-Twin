@@ -26,9 +26,9 @@ import {
 type TabKey = "crop" | "recipe" | "chp" | "weather" | "charts";
 
 const TABS: { key: TabKey; label: string }[] = [
+  { key: "chp", label: "🏗️ Θερμοκήπιο" },
   { key: "crop", label: "🍅 Καλλιέργεια" },
   { key: "recipe", label: "🌡️ Συνταγή γεωπονίας" },
-  { key: "chp", label: "🏗️ Θερμοκήπιο" },
   { key: "weather", label: "🌦️ Καιρός" },
   { key: "charts", label: "📈 Διαγράμματα" },
 ];
@@ -239,6 +239,17 @@ function App() {
       series={buildSeries([{ key: "screen_closed_hours", name: "Κλειστή", color: "var(--humidity)" }], isCompare)}
     />
   );
+  const fanPadChart = (
+    <ComparableChart
+      title="Ώρες ενεργού fan-pad ψύξης/ημέρα"
+      unit="h"
+      height={260}
+      domain={[0, 24]}
+      data={chartData}
+      xKey={xKey}
+      series={buildSeries([{ key: "fan_pad_active_hours", name: "Ενεργό", color: "var(--series-1)" }], isCompare)}
+    />
+  );
   const rhChart = (
     <ComparableChart
       title="Σχετική υγρασία εσωτερικού χώρου"
@@ -403,6 +414,7 @@ function App() {
                       unit=" kW"
                     />
                     <ScreenStatusBadge hours={latestDay.screen_closed_hours} />
+                    <FanPadStatusBadge hours={latestDay.fan_pad_active_hours} />
                   </>
                 )}
                 <dl className="spec-list">
@@ -579,6 +591,8 @@ function App() {
             />
           )}
 
+          {result && <div className="chart-grid pinned-yield">{yieldChart}</div>}
+
           {showSchematic && activeTab === "chp" && result && (
             <section className="stat-row">
               <StatTile label="Τελικό yield" value={`${result.summary.final_yield_kg_m2.toFixed(2)} kg/m²`} />
@@ -616,7 +630,6 @@ function App() {
                       value={`${result.summary.total_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
                     />
                   </section>
-                  <div className="chart-grid">{yieldChart}</div>
                 </>
               ) : (
                 <p className="side-note">Τρέξε μια προσομοίωση για να δεις αποτελέσματα καλλιέργειας.</p>
@@ -645,6 +658,7 @@ function App() {
                     {tempChart}
                     {heatChart}
                     {screenChart}
+                    {fanPadChart}
                     {rhChart}
                     {vpdChart}
                   </div>
@@ -665,9 +679,9 @@ function App() {
               {tempChart}
               {heatChart}
               {screenChart}
+              {fanPadChart}
               {rhChart}
               {vpdChart}
-              {yieldChart}
             </div>
           )}
 
@@ -726,6 +740,24 @@ function ScreenStatusBadge({ hours }: { hours: number }) {
       </div>
       <div className="gauge-track">
         <div className="gauge-fill screen" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** Fan-pad engagement for the last simulated day, as a fraction of 24h -- same
+ * caveat as ScreenStatusBadge: no single on/off "now" state, only hours engaged
+ * that day (twin/climate_model.py: fan_pad_active = enabled and ach > vent_min_ach). */
+function FanPadStatusBadge({ hours }: { hours: number }) {
+  const pct = (hours / 24) * 100;
+  return (
+    <div className="gauge">
+      <div className="gauge-head">
+        <span className="gauge-label">Fan-pad ψύξη (τελευταία ημέρα)</span>
+        <span className="gauge-value">{hours.toFixed(1)}/24h</span>
+      </div>
+      <div className="gauge-track">
+        <div className="gauge-fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -812,6 +844,7 @@ const COMPARE_KEYS: (keyof DailyPoint)[] = [
   "fruit_fresh_yield_kg_m2",
   "heat_used_kw",
   "screen_closed_hours",
+  "fan_pad_active_hours",
 ];
 
 function mergeForCompare(current: DailyPoint[], baseline: DailyPoint[]): Record<string, number>[] {
@@ -913,6 +946,7 @@ function downloadCsv(result: SimulationResult) {
     "fruit_fresh_yield_kg_m2",
     "heat_used_kw",
     "screen_closed_hours",
+    "fan_pad_active_hours",
   ] as const;
   const rows = result.daily_series.map((d) => headers.map((h) => d[h]).join(","));
   const csv = [headers.join(","), ...rows].join("\n");

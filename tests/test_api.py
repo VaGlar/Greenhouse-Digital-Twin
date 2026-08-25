@@ -62,6 +62,7 @@ def test_simulate_response_has_expected_summary_fields():
         "max_heat_available_kw",
         "heat_loss_avoided_kwh",
         "screen_deployed_pct",
+        "fan_pad_active_pct",
         "co2_ambient_ppm",
         "max_co2_available_ppm",
     ):
@@ -82,6 +83,7 @@ def test_simulate_daily_series_rows_have_expected_fields():
         "fruit_fresh_yield_kg_m2",
         "heat_used_kw",
         "screen_closed_hours",
+        "fan_pad_active_hours",
     ):
         assert key in row
 
