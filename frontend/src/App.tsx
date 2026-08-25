@@ -14,11 +14,13 @@ import { ParamSlider } from "./ParamSlider";
 import { GreenhouseSchematic, type ZoneKey } from "./GreenhouseSchematic";
 import {
   getConfig,
+  getWeatherPreview,
   runSimulation,
   type DailyPoint,
   type GreenhouseConfig,
   type SimulationOverrides,
   type SimulationResult,
+  type WeatherPreview,
 } from "./api";
 
 type TabKey = "crop" | "recipe" | "chp" | "weather" | "charts";
@@ -135,6 +137,8 @@ function App() {
   const [sliderValues, setSliderValues] = useState<Record<SliderKey, number>>(DEFAULT_SLIDER_VALUES);
   const [cropVariety, setCropVariety] = useState("");
   const [startDate, setStartDate] = useState("");
+  const [weatherPreview, setWeatherPreview] = useState<WeatherPreview | null>(null);
+  const [baselineResult, setBaselineResult] = useState<SimulationResult | null>(null);
 
   useEffect(() => {
     getConfig()
@@ -153,6 +157,13 @@ function App() {
       })
       .catch((e) => setError(String(e)));
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== "weather" || !startDate) return;
+    getWeatherPreview(startDate, sliderValues.duration_days)
+      .then(setWeatherPreview)
+      .catch(() => setWeatherPreview(null));
+  }, [activeTab, startDate, sliderValues.duration_days]);
 
   async function handleRun() {
     setLoading(true);
@@ -181,6 +192,9 @@ function App() {
 
   const latestDay = result?.daily_series.at(-1) ?? null;
   const showSchematic = activeTab !== "charts";
+  const isCompare = Boolean(result && baselineResult);
+  const chartData = result ? (baselineResult ? mergeForCompare(result.daily_series, baselineResult.daily_series) : result.daily_series) : [];
+  const xKey = isCompare ? "day" : "date";
 
   return (
     <div className="dashboard">
@@ -260,12 +274,47 @@ function App() {
             )}
 
             {activeTab === "recipe" && (
-              <p className="side-note">
-                Η συνταγή γεωπονίας (λίπανση/EC-pH, πρόγραμμα άρδευσης, κλάδεμα &amp; φορτίο
-                ταξιανθιών, επικονίαση) δεν είναι ακόμα μοντελοποιημένη — θα προστεθεί εδώ όταν
-                υλοποιηθεί. Οι στόχοι κλίματος (θερμοκρασία, CO₂, αφύγρανση) βρίσκονται πλέον στο
-                tab «Καιρός».
-              </p>
+              <>
+                <p className="side-note">
+                  Πληροφοριακές τιμές αναφοράς για εμπορική καλλιέργεια τομάτας υψηλού καλωδίου —
+                  <strong> δεν επηρεάζουν την προσομοίωση</strong>, καθώς λίπανση/άρδευση/κλάδεμα
+                  δεν είναι ακόμα μοντελοποιημένα (δες README roadmap). Οι στόχοι κλίματος
+                  (θερμοκρασία, CO₂, αφύγρανση) βρίσκονται στο tab «Καιρός».
+                </p>
+                <dl className="spec-list">
+                  <div className="spec-section-label">Λίπανση / Άρδευση</div>
+                  <div className="spec-row">
+                    <dt>EC θρεπτικού διαλύματος</dt>
+                    <dd>2.5–3.5 mS/cm</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>pH θρεπτικού διαλύματος</dt>
+                    <dd>5.5–6.5</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>Στόχος drainage</dt>
+                    <dd>20–30%</dd>
+                  </div>
+                  <div className="spec-section-label">Κλάδεμα / Φορτίο καρπού</div>
+                  <div className="spec-row">
+                    <dt>Σύστημα</dt>
+                    <dd>Single-stem, high-wire</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>Καρποί/ταξιανθία (θέρισμα)</dt>
+                    <dd>4–6</dd>
+                  </div>
+                  <div className="spec-section-label">Επικονίαση</div>
+                  <div className="spec-row">
+                    <dt>Μέθοδος</dt>
+                    <dd>Κυψέλες Bombus terrestris</dd>
+                  </div>
+                  <div className="spec-row">
+                    <dt>Πυκνότητα κυψελών</dt>
+                    <dd>~1 / 500–1.000 m²</dd>
+                  </div>
+                </dl>
+              </>
             )}
 
             {activeTab === "chp" && config && (
@@ -359,11 +408,74 @@ function App() {
                     </div>
                   )}
                 </dl>
+                {weatherPreview && (
+                  <div className="side-field">
+                    <span className="side-field-label">
+                      Προεπισκόπηση καιρού (πριν την προσομοίωση): εξωτ. θερμοκρασία &amp; ακτινοβολία
+                    </span>
+                    <ResponsiveContainer width="100%" height={110}>
+                      <LineChart
+                        data={weatherPreview.daily_series}
+                        margin={{ top: 4, right: 4, left: 4, bottom: 0 }}
+                      >
+                        <XAxis dataKey="date" hide />
+                        <YAxis yAxisId="temp" hide domain={["auto", "auto"]} />
+                        <YAxis yAxisId="solar" hide orientation="right" domain={[0, "auto"]} />
+                        <Tooltip
+                          contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }}
+                        />
+                        <Line
+                          yAxisId="temp"
+                          type="monotone"
+                          dataKey="temp_out_c"
+                          name="Εξωτ. θερμοκρασία (°C)"
+                          stroke="var(--series-2)"
+                          strokeWidth={1.5}
+                          dot={false}
+                          isAnimationActive={false}
+                        />
+                        <Line
+                          yAxisId="solar"
+                          type="monotone"
+                          dataKey="solar_rad_w_m2"
+                          name="Ακτινοβολία (W/m²)"
+                          stroke="var(--amber)"
+                          strokeWidth={1.5}
+                          dot={false}
+                          isAnimationActive={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </>
             )}
 
             {activeTab === "charts" && (
-              <p className="side-note">Τα αποτελέσματα εμφανίζονται δεξιά μετά την εκτέλεση.</p>
+              <>
+                <p className="side-note">Τα αποτελέσματα εμφανίζονται δεξιά μετά την εκτέλεση.</p>
+                {result && (
+                  <>
+                    {!baselineResult ? (
+                      <button className="secondary-button" onClick={() => setBaselineResult(result)}>
+                        📌 Καρφίτσωμα ως baseline
+                      </button>
+                    ) : (
+                      <button className="secondary-button" onClick={() => setBaselineResult(null)}>
+                        ✕ Αφαίρεση baseline
+                      </button>
+                    )}
+                    <p className="side-note">
+                      {baselineResult
+                        ? "Τα διαγράμματα δείχνουν το τρέχον τρέξιμο (συνεχής γραμμή) πάνω στο καρφιτσωμένο baseline (διακεκομμένη), κατά ημέρα προσομοίωσης."
+                        : "Καρφίτσωσε το τρέχον αποτέλεσμα, άλλαξε παραμέτρους, τρέξε ξανά και σύγκρινε τα δύο σενάρια σε επικάλυψη."}
+                    </p>
+                    <button className="secondary-button" onClick={() => downloadCsv(result)}>
+                      ⬇ Εξαγωγή CSV
+                    </button>
+                  </>
+                )}
+              </>
             )}
           </div>
 
@@ -413,90 +525,74 @@ function App() {
 
           {activeTab === "charts" && result && (
             <div className="chart-grid">
-              <section className="chart-card">
-                <h2>Θερμοκρασία</h2>
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="var(--gridline)" vertical={false} />
-                    <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
-                    <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit="°C" width={48} />
-                    <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
-                    <Legend />
-                    <Line type="monotone" dataKey="temp_in_c" name="Εσωτερική" stroke="var(--series-1)" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="temp_out_c" name="Εξωτερική" stroke="var(--series-2)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </section>
+              <ComparableChart
+                title="Θερμοκρασία"
+                unit="°C"
+                height={260}
+                data={chartData}
+                xKey={xKey}
+                series={buildSeries(
+                  [
+                    { key: "temp_in_c", name: "Εσωτερική", color: "var(--series-1)" },
+                    { key: "temp_out_c", name: "Εξωτερική", color: "var(--series-2)" },
+                  ],
+                  isCompare,
+                )}
+              />
 
-              <section className="chart-card">
-                <h2>Θερμική κατανάλωση (μέση ισχύς/ώρα)</h2>
-                <p className="chart-card-subtitle">
-                  Μέγιστη ισχύς CHP: {result.summary.max_heat_available_kw.toLocaleString()} kW — η κατανάλωση δεν
-                  μπορεί ποτέ να την ξεπεράσει.
-                </p>
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="var(--gridline)" vertical={false} />
-                    <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
-                    <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" kW" width={56} />
-                    <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
-                    <Legend />
-                    <Line type="monotone" dataKey="heat_used_kw" name="Μέση ισχύς" stroke="var(--energy)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </section>
+              <ComparableChart
+                title="Θερμική κατανάλωση (μέση ισχύς/ώρα)"
+                subtitle={`Μέγιστη ισχύς CHP: ${result.summary.max_heat_available_kw.toLocaleString()} kW — η κατανάλωση δεν μπορεί ποτέ να την ξεπεράσει.`}
+                unit=" kW"
+                height={260}
+                data={chartData}
+                xKey={xKey}
+                series={buildSeries([{ key: "heat_used_kw", name: "Μέση ισχύς", color: "var(--energy)" }], isCompare)}
+              />
 
-              <section className="chart-card">
-                <h2>Ώρες κλειστής θερμοκουρτίνας/ημέρα</h2>
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="var(--gridline)" vertical={false} />
-                    <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
-                    <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit="h" width={40} domain={[0, 24]} />
-                    <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
-                    <Line type="monotone" dataKey="screen_closed_hours" name="Κλειστή" stroke="var(--humidity)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </section>
+              <ComparableChart
+                title="Ώρες κλειστής θερμοκουρτίνας/ημέρα"
+                unit="h"
+                height={260}
+                domain={[0, 24]}
+                data={chartData}
+                xKey={xKey}
+                series={buildSeries(
+                  [{ key: "screen_closed_hours", name: "Κλειστή", color: "var(--humidity)" }],
+                  isCompare,
+                )}
+              />
 
-              <section className="chart-card">
-                <h2>Σχετική υγρασία εσωτερικού χώρου</h2>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="var(--gridline)" vertical={false} />
-                    <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
-                    <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit="%" width={48} domain={[0, 100]} />
-                    <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
-                    <Line type="monotone" dataKey="rh_in_pct" name="RH" stroke="var(--humidity)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </section>
+              <ComparableChart
+                title="Σχετική υγρασία εσωτερικού χώρου"
+                unit="%"
+                height={220}
+                domain={[0, 100]}
+                data={chartData}
+                xKey={xKey}
+                series={buildSeries([{ key: "rh_in_pct", name: "RH", color: "var(--humidity)" }], isCompare)}
+              />
 
-              <section className="chart-card">
-                <h2>VPD (έλλειμμα πίεσης υδρατμών)</h2>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="var(--gridline)" vertical={false} />
-                    <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
-                    <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" kPa" width={56} />
-                    <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
-                    <Line type="monotone" dataKey="vpd_kpa" name="VPD" stroke="var(--humidity)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </section>
+              <ComparableChart
+                title="VPD (έλλειμμα πίεσης υδρατμών)"
+                unit=" kPa"
+                height={220}
+                data={chartData}
+                xKey={xKey}
+                series={buildSeries([{ key: "vpd_kpa", name: "VPD", color: "var(--humidity)" }], isCompare)}
+              />
 
-              <section className="chart-card">
-                <h2>Σωρευτική παραγωγή τομάτας</h2>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="var(--gridline)" vertical={false} />
-                    <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
-                    <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" kg/m²" width={64} />
-                    <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
-                    <Line type="monotone" dataKey="fruit_fresh_yield_kg_m2" name="Yield" stroke="var(--series-4)" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </section>
+              <ComparableChart
+                title="Σωρευτική παραγωγή τομάτας"
+                unit=" kg/m²"
+                height={220}
+                data={chartData}
+                xKey={xKey}
+                series={buildSeries(
+                  [{ key: "fruit_fresh_yield_kg_m2", name: "Yield", color: "var(--series-4)" }],
+                  isCompare,
+                )}
+              />
             </div>
           )}
 
@@ -628,6 +724,130 @@ function Sparkline({ data, dataKey, color }: { data: DailyPoint[]; dataKey: keyo
       </LineChart>
     </ResponsiveContainer>
   );
+}
+
+/** Compare-mode merges two runs by day-offset (index within each run), not
+ * calendar date, since a baseline pinned from a different start_date/duration_days
+ * would otherwise not align on the x-axis at all. */
+const COMPARE_KEYS: (keyof DailyPoint)[] = [
+  "temp_in_c",
+  "temp_out_c",
+  "rh_in_pct",
+  "vpd_kpa",
+  "fruit_fresh_yield_kg_m2",
+  "heat_used_kw",
+  "screen_closed_hours",
+];
+
+function mergeForCompare(current: DailyPoint[], baseline: DailyPoint[]): Record<string, number>[] {
+  const len = Math.max(current.length, baseline.length);
+  const rows: Record<string, number>[] = [];
+  for (let i = 0; i < len; i++) {
+    const row: Record<string, number> = { day: i };
+    for (const k of COMPARE_KEYS) {
+      if (current[i]) row[`cur_${k}`] = current[i][k] as number;
+      if (baseline[i]) row[`base_${k}`] = baseline[i][k] as number;
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+interface ChartSeriesDef {
+  dataKey: string;
+  name: string;
+  color: string;
+  dashed?: boolean;
+}
+
+/** In compare mode, one metric becomes two lines (current + dashed baseline) sharing
+ * the same color; otherwise it's just the plain single-run line. */
+function buildSeries(keys: { key: string; name: string; color: string }[], compare: boolean): ChartSeriesDef[] {
+  if (!compare) {
+    return keys.map((k) => ({ dataKey: k.key, name: k.name, color: k.color }));
+  }
+  return keys.flatMap((k) => [
+    { dataKey: `cur_${k.key}`, name: `${k.name} (τρέχον)`, color: k.color },
+    { dataKey: `base_${k.key}`, name: `${k.name} (baseline)`, color: k.color, dashed: true },
+  ]);
+}
+
+function ComparableChart({
+  title,
+  subtitle,
+  unit,
+  height,
+  domain,
+  data,
+  xKey,
+  series,
+}: {
+  title: string;
+  subtitle?: string;
+  unit: string;
+  height: number;
+  domain?: [number, number];
+  data: Record<string, unknown>[];
+  xKey: string;
+  series: ChartSeriesDef[];
+}) {
+  return (
+    <section className="chart-card">
+      <h2>{title}</h2>
+      {subtitle && <p className="chart-card-subtitle">{subtitle}</p>}
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="var(--gridline)" vertical={false} />
+          <XAxis
+            dataKey={xKey}
+            stroke="var(--muted)"
+            tick={{ fontSize: 12 }}
+            minTickGap={40}
+            label={xKey === "day" ? { value: "Ημέρα", position: "insideBottomRight", offset: -4, fontSize: 11 } : undefined}
+          />
+          <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit={unit} width={56} domain={domain} />
+          <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
+          <Legend />
+          {series.map((s) => (
+            <Line
+              key={s.dataKey}
+              type="monotone"
+              dataKey={s.dataKey}
+              name={s.name}
+              stroke={s.color}
+              strokeWidth={2}
+              strokeDasharray={s.dashed ? "5 3" : undefined}
+              dot={false}
+              isAnimationActive={false}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </section>
+  );
+}
+
+function downloadCsv(result: SimulationResult) {
+  const headers = [
+    "date",
+    "temp_in_c",
+    "temp_out_c",
+    "co2_in_ppm",
+    "rh_in_pct",
+    "vpd_kpa",
+    "fruit_fresh_yield_kg_m2",
+    "heat_used_kw",
+    "screen_closed_hours",
+  ] as const;
+  const rows = result.daily_series.map((d) => headers.map((h) => d[h]).join(","));
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `greenhouse-simulation-${result.summary.duration_days}d.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default App;
