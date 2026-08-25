@@ -83,6 +83,7 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
                 "heat_used_kw": climate_result.heat_used_kw,
                 "heat_dumped_kw": climate_result.heat_dumped_kw,
                 "screen_deployed": climate_result.screen_deployed,
+                "fan_pad_active": climate_result.fan_pad_active,
                 "heat_loss_avoided_kw": climate_result.heat_loss_avoided_kw,
                 "vent_ach": climate_result.vent_ach,
                 "co2_injected_kg": climate_result.co2_injected_kg,

@@ -237,6 +237,51 @@ def test_fan_pad_cooling_disengaged_when_toggle_is_off_even_if_efficiency_is_set
     assert temp_c == 32.0
 
 
+def test_fan_pad_active_flag_is_true_when_engaged():
+    geometry = _geometry()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    pad_control = ClimateControlParams(
+        heating_setpoint_day_c=20.0,
+        heating_setpoint_night_c=17.0,
+        fan_pad_cooling_enabled=True,
+        fan_pad_efficiency=0.80,
+    )
+    hot_state = ClimateState(temp_in_c=32.0, co2_in_ppm=420.0)
+    result = GreenhouseClimateModel(geometry, chp, pad_control).step(
+        hot_state, hour=13, temp_out_c=32.0, solar_rad_w_m2=800.0, dt_hours=1.0, rh_out_pct=25.0
+    )
+    assert result.fan_pad_active is True
+
+
+def test_fan_pad_active_flag_is_false_when_toggle_is_off():
+    geometry = _geometry()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    no_pad_control = _control()
+    hot_state = ClimateState(temp_in_c=32.0, co2_in_ppm=420.0)
+    result = GreenhouseClimateModel(geometry, chp, no_pad_control).step(
+        hot_state, hour=13, temp_out_c=32.0, solar_rad_w_m2=800.0, dt_hours=1.0, rh_out_pct=25.0
+    )
+    assert result.fan_pad_active is False
+
+
+def test_fan_pad_active_flag_is_false_during_passive_baseline_ventilation():
+    geometry = _geometry()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    pad_control = ClimateControlParams(
+        heating_setpoint_day_c=20.0,
+        heating_setpoint_night_c=17.0,
+        fan_pad_cooling_enabled=True,
+        fan_pad_efficiency=0.80,
+    )
+    # Cool night, well under the vent setpoint -- ventilation stays at the passive
+    # baseline (vent_min_ach), so the pads should not be reported as engaged.
+    cool_state = ClimateState(temp_in_c=17.0, co2_in_ppm=420.0)
+    result = GreenhouseClimateModel(geometry, chp, pad_control).step(
+        cool_state, hour=2, temp_out_c=10.0, solar_rad_w_m2=0.0, dt_hours=1.0, rh_out_pct=70.0
+    )
+    assert result.fan_pad_active is False
+
+
 def test_active_dehumidification_caps_relative_humidity_at_setpoint():
     # Demand comfortably within the default (~771 kg/hour) capacity -- reaches the setpoint.
     geometry = _geometry()

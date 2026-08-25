@@ -60,6 +60,8 @@ export interface DailyPoint {
   heat_used_kw: number;
   /** Hours that day the thermal screen was deployed (fully automatic — see backend). */
   screen_closed_hours: number;
+  /** Hours that day fan-pad cooling was engaged (fully automatic — see backend). */
+  fan_pad_active_hours: number;
 }
 
 export interface SimulationResult {
@@ -73,6 +75,7 @@ export interface SimulationResult {
     max_heat_available_kw: number;
     heat_loss_avoided_kwh: number;
     screen_deployed_pct: number;
+    fan_pad_active_pct: number;
     co2_ambient_ppm: number;
     max_co2_available_ppm: number;
   };
