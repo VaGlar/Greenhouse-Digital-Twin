@@ -31,5 +31,6 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`co2-lai-growth-boost.md`](./co2-lai-growth-boost.md) | `CO2_LAI_BOOST_MAX`, `CO2_AMBIENT_REFERENCE_PPM` |
 | [`thermal-screen-automatic-control-logic.md`](./thermal-screen-automatic-control-logic.md) | Screen deploy/retract logic, `chp_heat_margin_fraction`, `VENT_RAMP_BAND_C` reuse — user-specified control logic, not a literature source |
 | [`open-meteo-historical-weather-api.md`](./open-meteo-historical-weather-api.md) | `weather.source: csv_typical_year` — real weather data source for Αλεξάνδρεια Ημαθίας (script written, not yet run) |
+| [`fan-pad-evaporative-cooling.md`](./fan-pad-evaporative-cooling.md) | `climate_control.fan_pad_efficiency`, `_wet_bulb_temp_c` |
 
 See [`docs/assumptions/sources.xlsx`](../docs/assumptions/sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

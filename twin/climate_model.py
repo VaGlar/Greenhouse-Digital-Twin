@@ -21,6 +21,14 @@ solar gain, so on a cold-but-sunny hour closing it can lose more heat than
 it saves; a real controller wouldn't do that, so neither does this one).
 Modeled as a simple deployed/retracted toggle, not a continuous position.
 
+Fan-pad evaporative cooling: an optional, config-toggleable feature
+(control.fan_pad_cooling_enabled, off by default). When on, air drawn in by
+active (above-baseline) ventilation is treated as pre-cooled AND
+pre-humidified by wet pads before it reaches the greenhouse -- both effects
+together, since the pad process is adiabatic (the heat removed evaporating
+water into the air is exactly what humidifies it). See
+_fan_pad_outdoor_conditions.
+
 Humidity: tracked as vapor pressure (kPa), the same way real greenhouse
 models do (rather than tracking relative humidity directly, which is
 nonlinear in temperature). Water enters the air from crop transpiration
@@ -43,9 +51,7 @@ CO2_DENSITY_KG_M3 = 1.83  # density of CO2 gas at ~20C, used only to convert mas
 WATER_MOLAR_MASS_G_MOL = 18.02  # physical constant
 GAS_CONSTANT_J_MOL_K = 8.314  # physical constant (ideal gas law)
 # PLACEHOLDER: degrees above vent_setpoint over which ventilation ramps from vent_min_ach to
-# vent_max_ach. Also used as the "too hot" screen-shading threshold (vent_setpoint +
-# VENT_RAMP_BAND_C = the point ventilation is already fully ramped) -- shared so the two stay
-# consistent by construction.
+# vent_max_ach.
 VENT_RAMP_BAND_C = 5.0
 
 
@@ -61,6 +67,22 @@ def _dew_point_c(vapor_pressure_kpa: float) -> float:
     vapor_pressure_kpa = max(vapor_pressure_kpa, 1e-6)
     ln_term = math.log(vapor_pressure_kpa / 0.6108)
     return 237.3 * ln_term / (17.27 - ln_term)
+
+
+def _wet_bulb_temp_c(temp_c: float, rh_pct: float) -> float:
+    """Stull (2011) empirical approximation of wet-bulb temperature from dry-bulb
+    temperature and relative humidity -- standard meteorological formula, not a model
+    assumption. Source: Stull, R., "Wet-Bulb Temperature from Relative Humidity and Air
+    Temperature", J. Applied Meteorology and Climatology, 50(11), 2267-2269 (2011).
+    Valid roughly over -20 to 50C and 5-99% RH, which covers this project's weather data."""
+    rh = max(5.0, min(99.0, rh_pct))
+    return (
+        temp_c * math.atan(0.151977 * math.sqrt(rh + 8.313659))
+        + math.atan(temp_c + rh)
+        - math.atan(rh - 1.676331)
+        + 0.00391838 * rh**1.5 * math.atan(0.023101 * rh)
+        - 4.686035
+    )
 
 
 @dataclass
@@ -101,6 +123,51 @@ class GreenhouseClimateModel:
         self.control = control
         self._thermal_capacity_j_k = control.effective_heat_capacity_j_m2k * geometry.area_m2
 
+    def _ventilated_temp(
+        self, temp_before_c: float, temp_out_c: float, ach: float, dt_hours: float, vent_setpoint: float
+    ) -> float:
+        """One hour of ventilation cooling at the given ACH. Bug fix 2026-08-25: the naive linear
+        removal (ach * delta_t, applied for the full hour) overshoots badly when ach and delta_t
+        are both large -- e.g. a cold, sunny day: solar gain pushes temp well above vent_setpoint,
+        the ramp logic below correctly reacts with a high ach, but removing a full hour's worth of
+        heat at that rate against a huge indoor-outdoor gradient blew straight through vent_setpoint
+        and crashed to outdoor air temperature (once literally hit exactly, confirmed via a real
+        low-temp run: indoor == outdoor == 3.91C at 11:00, with heat_used_kw=0 because the crash
+        happened via ventilation *after* the heating decision, and vent_ach spiked to 6.4). A real
+        thermostatic vent controller stops removing heat once it reaches its target (vent_setpoint)
+        rather than continuing until indoor matches outdoor -- floor the result there instead,
+        except for the always-present baseline leakage (ach == vent_min_ach), which is passive
+        exchange, not active regulation, and should keep drifting toward outdoor air normally."""
+        dt_s = dt_hours * 3600.0
+        c_total = self._thermal_capacity_j_k
+        delta_t = temp_before_c - temp_out_c
+        vent_removal_w = ach * self.geometry.volume_m3 * AIR_VOLUMETRIC_HEAT_CAPACITY_J_M3K / 3600.0 * delta_t
+        temp_after = temp_before_c - vent_removal_w * dt_s / c_total
+        if delta_t > 0:
+            floor = max(temp_out_c, vent_setpoint) if ach > self.control.vent_min_ach else temp_out_c
+            temp_after = max(temp_after, floor)
+        return temp_after
+
+    def _fan_pad_outdoor_conditions(self, temp_out_c: float, rh_out_pct: float) -> tuple[float, float]:
+        """Effective outdoor air (temperature, vapor pressure kPa) after passing through
+        fan-and-pad evaporative cooling pads, if the greenhouse has them and they're
+        engaged. The pads move air a fraction (fan_pad_efficiency) of the way from raw
+        outdoor dry-bulb conditions toward saturation at the outdoor wet-bulb temperature.
+        Temperature and vapor pressure move together along this same fraction because the
+        process is adiabatic (approximately constant wet-bulb): the heat removed from the
+        air goes into evaporating water into it, so pad-cooled air is necessarily also
+        pad-humidified -- this is what lets a fan-pad system cool the greenhouse below raw
+        outdoor air temperature, at the cost of raising the humidity ventilation brings in.
+        Returns raw outdoor conditions unchanged when the toggle is off."""
+        vapor_out_kpa = _saturation_vapor_pressure_kpa(temp_out_c) * rh_out_pct / 100.0
+        if not self.control.fan_pad_cooling_enabled:
+            return temp_out_c, vapor_out_kpa
+        wet_bulb_c = _wet_bulb_temp_c(temp_out_c, rh_out_pct)
+        eff = self.control.fan_pad_efficiency
+        temp_pad_c = temp_out_c - eff * (temp_out_c - wet_bulb_c)
+        vapor_pad_kpa = vapor_out_kpa + eff * (_saturation_vapor_pressure_kpa(wet_bulb_c) - vapor_out_kpa)
+        return temp_pad_c, vapor_pad_kpa
+
     def decide_screen_deployment(
         self,
         state: ClimateState,
@@ -108,6 +175,7 @@ class GreenhouseClimateModel:
         temp_out_c: float,
         solar_rad_w_m2: float,
         dt_hours: float,
+        rh_out_pct: float = 60.0,
     ) -> bool:
         """Decide deploy/retract for this hour, before the screen's own effect is applied to
         the energy balance -- see module docstring for the 3 criteria. Public so twin/simulate.py
@@ -126,15 +194,22 @@ class GreenhouseClimateModel:
         )
 
         # "Too hot" means ventilation alone (even fully ramped) won't be enough -- not merely
-        # "ventilation has started ramping up", which is its normal job and handles the vast
-        # majority of solar load on its own (confirmed: with no screen at all, actual indoor
-        # temp never exceeded ~25C across a 150-day run even though ventilation ramps starting
-        # right at vent_setpoint). Using vent_setpoint alone made the screen shade ~59% of all
-        # daytime hours and cut yield ~17% for no real overheating benefit -- see
-        # docs/assumptions/climate-control.md.
+        # "ventilation has started ramping up", which is its normal job. Checked by actually
+        # applying max-ACH ventilation (via the same _ventilated_temp helper step() uses) to the
+        # unscreened projection, rather than comparing the raw pre-ventilation number to a fixed
+        # margin -- the fixed-margin version (vent_setpoint + VENT_RAMP_BAND_C) made the screen
+        # shade ~59% of all daytime hours and cut yield ~17% for no real overheating benefit; see
+        # docs/assumptions/climate-control.md for that finding and this one.
+        # If this greenhouse has fan-pad cooling, max ventilation draws in pad-cooled (not
+        # raw outdoor) air -- check against that, so the screen doesn't shade unnecessarily
+        # on a hot-but-dry day the pads could have handled alone.
+        temp_out_c_for_vent, _ = self._fan_pad_outdoor_conditions(temp_out_c, rh_out_pct)
         temp_pred_no_screen = state.temp_in_c + (q_solar_w_full - q_trans_loss_w_full) * dt_s / c_total
-        if temp_pred_no_screen > vent_setpoint + VENT_RAMP_BAND_C:
-            return True  # projected overheating even at max ventilation -- shading only helps here
+        temp_after_max_vent = self._ventilated_temp(
+            temp_pred_no_screen, temp_out_c_for_vent, self.control.vent_max_ach, dt_hours, vent_setpoint
+        )
+        if temp_after_max_vent > vent_setpoint + 0.01:
+            return True  # even full ventilation can't hold vent_setpoint -- shading actually needed
 
         heat_available_w = self.chp.heat_available_kw * 1000.0
         required_w_no_screen = max(0.0, (setpoint - temp_pred_no_screen) * c_total / dt_s)
@@ -199,11 +274,17 @@ class GreenhouseClimateModel:
         ramp_fraction = min(1.0, excess / VENT_RAMP_BAND_C)
         ach = self.control.vent_min_ach + (self.control.vent_max_ach - self.control.vent_min_ach) * ramp_fraction
 
-        delta_t = temp_after_heat - temp_out_c
-        vent_removal_w = ach * self.geometry.volume_m3 * AIR_VOLUMETRIC_HEAT_CAPACITY_J_M3K / 3600.0 * delta_t
-        temp_new = temp_after_heat - vent_removal_w * dt_s / c_total
-        if delta_t > 0:
-            temp_new = max(temp_new, temp_out_c)  # ventilation can't cool below outside air
+        # Fan-pad cooling only engages alongside active (above-baseline) ventilation -- a
+        # real system runs its pads together with the exhaust fans, not during passive
+        # leakage. When active, ventilation draws in pad-cooled (and pad-humidified) air
+        # instead of raw outdoor air, for both the temperature and humidity balances below.
+        if self.control.fan_pad_cooling_enabled and ach > self.control.vent_min_ach:
+            temp_out_c_for_vent, vapor_out_kpa = self._fan_pad_outdoor_conditions(temp_out_c, rh_out_pct)
+        else:
+            temp_out_c_for_vent = temp_out_c
+            vapor_out_kpa = _saturation_vapor_pressure_kpa(temp_out_c) * rh_out_pct / 100.0
+
+        temp_new = self._ventilated_temp(temp_after_heat, temp_out_c_for_vent, ach, dt_hours, vent_setpoint)
 
         # --- CO2 balance: fixed CHP output, but dosing is capped at the
         # setpoint (like a real CO2 dosing controller) — the rest of the
@@ -225,9 +306,9 @@ class GreenhouseClimateModel:
         delta_ppm_injection = injected_kg / CO2_DENSITY_KG_M3 / self.geometry.volume_m3 * 1e6
         co2_new = max(co2_before_dosing + delta_ppm_injection, 200.0)
 
-        # --- Humidity balance: ventilation exchange (same ach as above) plus
-        # crop transpiration, tracked as vapor pressure (kPa). ---
-        vapor_out_kpa = _saturation_vapor_pressure_kpa(temp_out_c) * rh_out_pct / 100.0
+        # --- Humidity balance: ventilation exchange (same ach and, if fan-pad cooling is
+        # engaged, the same pad-humidified vapor_out_kpa as above) plus crop transpiration,
+        # tracked as vapor pressure (kPa). ---
         vapor_after_vent = vapor_out_kpa + (state.vapor_pressure_kpa - vapor_out_kpa) * math.exp(-ach * dt_hours)
 
         transpiration_kg = transpiration_kg_per_hour * dt_hours

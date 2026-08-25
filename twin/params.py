@@ -113,6 +113,20 @@ class ClimateControlParams:
     # the optimum for pollination (>80% pollen clumps together; <60% stigma dries out) -- used as
     # the single setpoint. See docs/assumptions/climate-control.md.
     dehumidification_setpoint_pct: float = 70.0
+    # Initial config choice, off by default: does this greenhouse have a fan-and-pad
+    # evaporative cooling system? When enabled, air drawn in by active ventilation is
+    # first pre-cooled (and humidified) by passing through wet pads before entering the
+    # greenhouse, letting ventilation cool below the raw outdoor dry-bulb temperature.
+    # See docs/assumptions/climate-control.md and papers/geothermiki-s192g-quote.md (the
+    # vendor quote's "cooling panels").
+    fan_pad_cooling_enabled: bool = False
+    # SOURCED: fraction of the way from outdoor dry-bulb conditions to saturation at the
+    # outdoor wet-bulb temperature that pad-cooled air reaches. UF/IFAS Extension (Fan and
+    # Pad Greenhouse Evaporative Cooling Systems, CIR1135/AE069) cites up to 85% for a
+    # well-designed, well-maintained system; Alabama Extension gives 70-85% for well-
+    # maintained systems generally. 0.80 is a representative value within that range. Only
+    # used when fan_pad_cooling_enabled is True. See docs/assumptions/climate-control.md.
+    fan_pad_efficiency: float = 0.80
 
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
@@ -121,6 +135,8 @@ class ClimateControlParams:
             raise ValueError("chp_heat_margin_fraction must be in (0, 1]")
         if self.vent_max_ach < self.vent_min_ach:
             raise ValueError("vent_max_ach must be >= vent_min_ach")
+        if not 0 < self.fan_pad_efficiency <= 1:
+            raise ValueError("fan_pad_efficiency must be in (0, 1]")
         if self.effective_heat_capacity_j_m2k <= 0:
             raise ValueError("effective_heat_capacity_j_m2k must be > 0")
         if not 0 <= self.cover_surface_temp_fraction <= 1:

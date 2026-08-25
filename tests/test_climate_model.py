@@ -90,6 +90,37 @@ def test_cold_cover_condenses_moisture_out_of_humid_air():
     assert result.condensed_kg > 0.0
 
 
+def test_ventilation_does_not_overshoot_below_vent_setpoint_on_cold_sunny_days():
+    geometry = _geometry()
+    control = _control()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    # Cold outside but strong sun -- pushes indoor well above vent_setpoint, forcing max-ramp
+    # ventilation. Bug (fixed 2026-08-25): the naive linear removal crashed indoor air all the
+    # way down to outdoor temperature instead of stopping at vent_setpoint.
+    hot_state = ClimateState(temp_in_c=20.0, co2_in_ppm=420.0)
+    result = model.step(hot_state, hour=11, temp_out_c=-5.0, solar_rad_w_m2=900.0, dt_hours=1.0)
+
+    vent_setpoint = control.heating_setpoint_day_c + control.vent_temp_margin_c
+    assert result.state.temp_in_c == vent_setpoint
+    assert result.state.temp_in_c > -5.0  # must not have crashed toward outdoor air
+
+
+def test_ventilation_still_floors_at_outdoor_air_on_a_genuinely_hot_day():
+    geometry = _geometry()
+    control = _control()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    # Outdoor air itself is already above vent_setpoint -- ventilation legitimately can't cool
+    # below ambient, this is not the overshoot bug, so the floor should be outdoor temp here.
+    hot_state = ClimateState(temp_in_c=30.0, co2_in_ppm=420.0)
+    result = model.step(hot_state, hour=13, temp_out_c=25.0, solar_rad_w_m2=800.0, dt_hours=1.0)
+
+    assert result.state.temp_in_c >= 25.0
+
+
 def test_screen_deploys_at_night_regardless_of_conditions():
     geometry = _geometry()
     control = _control()
@@ -136,6 +167,72 @@ def test_screen_stays_retracted_when_cold_but_sun_outweighs_insulation_benefit()
     # its insulation would save, so a real controller (and this one) should leave it open
     state = ClimateState(temp_in_c=5.0, co2_in_ppm=420.0)
     assert model.decide_screen_deployment(state, hour=13, temp_out_c=-10.0, solar_rad_w_m2=200.0, dt_hours=1.0) is False
+
+
+def test_fan_pad_cooling_pulls_temperature_below_raw_outdoor_air():
+    geometry = _geometry()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+
+    no_pad_control = _control()
+    pad_control = ClimateControlParams(
+        heating_setpoint_day_c=20.0,
+        heating_setpoint_night_c=17.0,
+        fan_pad_cooling_enabled=True,
+        fan_pad_efficiency=0.80,
+    )
+
+    # Hot, dry midday -- low RH means a big dry-bulb/wet-bulb gap, so pads have real
+    # cooling potential; active (above-baseline) ventilation is engaged either way.
+    hot_state = ClimateState(temp_in_c=32.0, co2_in_ppm=420.0)
+    no_pad_result = GreenhouseClimateModel(geometry, chp, no_pad_control).step(
+        hot_state, hour=13, temp_out_c=32.0, solar_rad_w_m2=800.0, dt_hours=1.0, rh_out_pct=25.0
+    )
+    pad_result = GreenhouseClimateModel(geometry, chp, pad_control).step(
+        hot_state, hour=13, temp_out_c=32.0, solar_rad_w_m2=800.0, dt_hours=1.0, rh_out_pct=25.0
+    )
+
+    assert pad_result.state.temp_in_c < no_pad_result.state.temp_in_c
+
+
+def test_fan_pad_cooling_also_raises_humidity_brought_in_by_ventilation():
+    geometry = _geometry()
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+
+    no_pad_control = _control()
+    pad_control = ClimateControlParams(
+        heating_setpoint_day_c=20.0,
+        heating_setpoint_night_c=17.0,
+        fan_pad_cooling_enabled=True,
+        fan_pad_efficiency=0.80,
+    )
+
+    # Same dry, hot, actively-ventilated scenario -- pad-cooled air is necessarily also
+    # pad-humidified (adiabatic process), so vapor pressure should end up higher than
+    # ventilating with raw dry outdoor air.
+    dry_state = ClimateState(temp_in_c=32.0, co2_in_ppm=420.0, vapor_pressure_kpa=1.0)
+    no_pad_result = GreenhouseClimateModel(geometry, chp, no_pad_control).step(
+        dry_state, hour=13, temp_out_c=32.0, solar_rad_w_m2=800.0, dt_hours=1.0, rh_out_pct=25.0
+    )
+    pad_result = GreenhouseClimateModel(geometry, chp, pad_control).step(
+        dry_state, hour=13, temp_out_c=32.0, solar_rad_w_m2=800.0, dt_hours=1.0, rh_out_pct=25.0
+    )
+
+    assert pad_result.state.vapor_pressure_kpa > no_pad_result.state.vapor_pressure_kpa
+
+
+def test_fan_pad_cooling_disengaged_when_toggle_is_off_even_if_efficiency_is_set():
+    geometry = _geometry()
+    control = ClimateControlParams(
+        heating_setpoint_day_c=20.0,
+        heating_setpoint_night_c=17.0,
+        fan_pad_cooling_enabled=False,
+        fan_pad_efficiency=0.80,
+    )
+    chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    model = GreenhouseClimateModel(geometry, chp, control)
+
+    temp_c, vapor_kpa = model._fan_pad_outdoor_conditions(temp_out_c=32.0, rh_out_pct=25.0)
+    assert temp_c == 32.0
 
 
 def test_active_dehumidification_caps_relative_humidity_at_setpoint():
