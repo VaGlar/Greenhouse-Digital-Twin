@@ -12,8 +12,9 @@ from datetime import date
 from pathlib import Path
 
 import yaml
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from twin.climate_model import CO2_DENSITY_KG_M3
@@ -33,6 +34,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(ValueError)
+def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
+    """twin/params.py raises plain ValueError on out-of-range overrides (e.g. a
+    duration_days <= 0 or a dehumidification_setpoint_pct outside (0, 100]).
+    Without this handler FastAPI lets it propagate as an unhandled 500 with a
+    stack trace, instead of a client error the frontend can show to the user.
+    """
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.get("/health")
