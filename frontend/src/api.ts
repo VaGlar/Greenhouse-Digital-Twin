@@ -16,7 +16,12 @@ const API_BASE = detectApiBase();
 
 export interface GreenhouseConfig {
   name: string;
-  geometry: { area_m2: number; height_m: number };
+  geometry: {
+    area_m2: number;
+    height_m: number;
+    cover_u_value_w_m2k: number;
+    cover_transmissivity: number;
+  };
   chp: { electric_power_kw: number; heat_to_power_ratio: number; co2_kg_per_kwh_elec: number };
   crop: { variety: string; planting_date: string; density_plants_per_m2: number };
   simulation: { start_date: string; duration_days: number; timestep_hours: number };
@@ -26,8 +31,10 @@ export interface GreenhouseConfig {
     co2_setpoint_day_ppm: number;
     screen_energy_saving_fraction: number;
     dehumidification_setpoint_pct: number;
+    fan_pad_cooling_enabled: boolean;
     [key: string]: unknown;
   };
+  weather: { source: string; latitude_deg: number; [key: string]: unknown };
   [key: string]: unknown;
 }
 
