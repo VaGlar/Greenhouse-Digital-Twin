@@ -1,5 +1,7 @@
 from datetime import date
 
+import pytest
+
 from twin.crop_model import (
     CropState,
     TomatoCropModel,
@@ -165,38 +167,38 @@ def test_canopy_light_response_is_zero_with_no_light_or_no_leaves():
     assert _canopy_light_response(500.0, lai=0.0) == 0.0
 
 
-def test_nighttime_respiration_creates_a_repayable_deficit():
+def test_respiration_reference_does_not_shrink_with_standing_biomass():
+    # Bug fix 2026-08-25 (revised same day -- see TomatoCropModel.step for the full
+    # story): respiration used to be charged directly against standing_dry_matter_g_m2,
+    # which can shrink on a net-negative (typically nighttime) hour -- and since LAI
+    # doesn't depend on standing biomass, a smaller pool meant strictly less future
+    # respiration to pay, for free. respiration_reference_g_m2 is a running high-water
+    # mark instead: it must never decrease even when standing biomass does.
     model = TomatoCropModel(_crop_params(), ground_area_m2=5000)
-    state = CropState(days_after_planting=40.0, standing_dry_matter_g_m2=500.0)
-
-    result = model.step(state, temp_in_c=18.0, co2_in_ppm=420.0, solar_rad_w_m2=0.0, dt_hours=1.0)
-
-    assert result.state.respiration_deficit_g_m2 > 0.0
-
-
-def test_deficit_must_be_repaid_before_any_growth_credits_fruit():
-    # Bug fix 2026-08-25: previously, respiration losses on net-negative hours (no
-    # light -- typically night) just vanished with no further consequence, since LAI
-    # doesn't depend on standing biomass -- meaning warmer, more wasteful nights were
-    # perversely *raising* final yield (less future respiration to pay), the opposite
-    # of the real, literature-documented effect. Now a deficit accumulates and must
-    # be repaid by future net-positive growth before anything reaches fruit.
-    model = TomatoCropModel(_crop_params(fruiting_start_days=0.0, fruiting_ramp_days=0.0001), ground_area_m2=5000)
-    state = CropState(days_after_planting=40.0, standing_dry_matter_g_m2=500.0)
+    state = CropState(days_after_planting=40.0, standing_dry_matter_g_m2=500.0, respiration_reference_g_m2=500.0)
 
     night = model.step(state, temp_in_c=18.0, co2_in_ppm=420.0, solar_rad_w_m2=0.0, dt_hours=1.0)
-    assert night.state.respiration_deficit_g_m2 > 0.0
 
-    # A weak daytime hour, not enough net growth to fully clear the deficit --
-    # none of it should reach fruit yet.
-    weak_day = model.step(night.state, temp_in_c=22.0, co2_in_ppm=420.0, solar_rad_w_m2=5.0, dt_hours=1.0)
-    assert weak_day.state.respiration_deficit_g_m2 > 0.0
-    assert weak_day.state.fruit_dry_matter_g_m2 == night.state.fruit_dry_matter_g_m2
+    assert night.state.standing_dry_matter_g_m2 < state.standing_dry_matter_g_m2
+    assert night.state.respiration_reference_g_m2 >= state.respiration_reference_g_m2
 
-    # A strong daytime hour clears the remaining deficit and finally credits fruit.
-    strong_day = model.step(weak_day.state, temp_in_c=22.0, co2_in_ppm=900.0, solar_rad_w_m2=900.0, dt_hours=1.0)
-    assert strong_day.state.respiration_deficit_g_m2 == 0.0
-    assert strong_day.state.fruit_dry_matter_g_m2 > weak_day.state.fruit_dry_matter_g_m2
+
+def test_a_bad_night_no_longer_discounts_the_next_night_s_respiration():
+    # The exploit this fix closes, isolated: two consecutive net-negative (night)
+    # hours from the same starting biomass should cost the *same* respiration each
+    # time -- not less the second time just because the first hour shrank standing
+    # biomass. (First attempt at fixing this -- a "repay before fruit" deficit ledger
+    # -- flipped the sign correctly but double-charged the loss; see step()'s comment
+    # for the season-total numbers that showed it. Reverted in favor of this.)
+    model = TomatoCropModel(_crop_params(), ground_area_m2=5000)
+    state = CropState(days_after_planting=40.0, standing_dry_matter_g_m2=500.0, respiration_reference_g_m2=500.0)
+
+    first_night = model.step(state, temp_in_c=18.0, co2_in_ppm=420.0, solar_rad_w_m2=0.0, dt_hours=1.0)
+    second_night = model.step(first_night.state, temp_in_c=18.0, co2_in_ppm=420.0, solar_rad_w_m2=0.0, dt_hours=1.0)
+
+    first_loss = state.standing_dry_matter_g_m2 - first_night.state.standing_dry_matter_g_m2
+    second_loss = first_night.state.standing_dry_matter_g_m2 - second_night.state.standing_dry_matter_g_m2
+    assert second_loss == pytest.approx(first_loss, rel=1e-6)
 
 
 def test_warmer_nights_no_longer_increase_seasonal_yield():

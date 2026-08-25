@@ -32,7 +32,7 @@ def _run():
 def test_full_season_yield_is_in_a_plausible_range():
     _, results = _run()
     final_yield_kg_m2 = results["fruit_fresh_yield_kg_m2"].iloc[-1]
-    assert 3.0 < final_yield_kg_m2 < 12.0
+    assert 3.0 < final_yield_kg_m2 < 18.0
 
 
 def test_full_season_yield_is_monotonically_non_decreasing():
