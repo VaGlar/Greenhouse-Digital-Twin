@@ -129,7 +129,7 @@ const SLIDER_GROUPS: SliderGroup[] = [
     label: "📅 Προσομοίωση",
     zone: null,
     sliders: [
-      { key: "duration_days", label: "Διάρκεια", unit: " μέρες", min: 30, max: 300, step: 10 },
+      { key: "duration_days", label: "Διάρκεια", unit: " μέρες", min: 30, max: 330, step: 10 },
     ],
   },
 ];
@@ -140,7 +140,7 @@ const DEFAULT_SLIDER_VALUES: Record<SliderKey, number> = {
   heating_setpoint_night_c: 17,
   co2_setpoint_day_ppm: 900,
   dehumidification_setpoint_pct: 70,
-  duration_days: 150,
+  duration_days: 330,
 };
 
 function App() {

@@ -224,7 +224,8 @@ class WeatherParams:
 @dataclass
 class SimulationParams:
     start_date: date
-    duration_days: int = 120
+    duration_days: int = 330  # SOURCED: real commercial indeterminate greenhouse tomato cropping
+    # cycles run ~10-11 months before replanting. See docs/assumptions/crop-model.md.
     timestep_hours: float = 1.0
 
     def __post_init__(self) -> None:

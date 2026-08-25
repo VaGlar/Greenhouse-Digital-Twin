@@ -82,5 +82,7 @@ weather:
 
 simulation:
   start_date: 2026-09-15
-  duration_days: 150
+  duration_days: 330   # SOURCED: real commercial indeterminate greenhouse tomato cropping cycles
+                        # run ~10-11 months before replanting -- the plant itself has no natural
+                        # end-of-life (indeterminate growth). See docs/assumptions/crop-model.md.
   timestep_hours: 1.0
