@@ -1,8 +1,0 @@
-# New Codespaces now run setup (venv + pip install + npm install) automatically
-# via .devcontainer/devcontainer.json. Just run these two to start the servers:
-
-source .venv/bin/activate
-uvicorn api.main:app --reload --port 8123
-
-cd frontend
-npm run dev -- --host
