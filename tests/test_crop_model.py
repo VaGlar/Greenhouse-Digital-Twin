@@ -164,6 +164,62 @@ def test_canopy_light_response_is_zero_with_no_light_or_no_leaves():
     assert _canopy_light_response(500.0, lai=0.0) == 0.0
 
 
+def test_nighttime_respiration_creates_a_repayable_deficit():
+    model = TomatoCropModel(_crop_params(), ground_area_m2=5000)
+    state = CropState(days_after_planting=40.0, standing_dry_matter_g_m2=500.0)
+
+    result = model.step(state, temp_in_c=18.0, co2_in_ppm=420.0, solar_rad_w_m2=0.0, dt_hours=1.0)
+
+    assert result.state.respiration_deficit_g_m2 > 0.0
+
+
+def test_deficit_must_be_repaid_before_any_growth_credits_fruit():
+    # Bug fix 2026-08-25: previously, respiration losses on net-negative hours (no
+    # light -- typically night) just vanished with no further consequence, since LAI
+    # doesn't depend on standing biomass -- meaning warmer, more wasteful nights were
+    # perversely *raising* final yield (less future respiration to pay), the opposite
+    # of the real, literature-documented effect. Now a deficit accumulates and must
+    # be repaid by future net-positive growth before anything reaches fruit.
+    model = TomatoCropModel(_crop_params(fruiting_start_days=0.0, fruiting_ramp_days=0.0001), ground_area_m2=5000)
+    state = CropState(days_after_planting=40.0, standing_dry_matter_g_m2=500.0)
+
+    night = model.step(state, temp_in_c=18.0, co2_in_ppm=420.0, solar_rad_w_m2=0.0, dt_hours=1.0)
+    assert night.state.respiration_deficit_g_m2 > 0.0
+
+    # A weak daytime hour, not enough net growth to fully clear the deficit --
+    # none of it should reach fruit yet.
+    weak_day = model.step(night.state, temp_in_c=22.0, co2_in_ppm=420.0, solar_rad_w_m2=5.0, dt_hours=1.0)
+    assert weak_day.state.respiration_deficit_g_m2 > 0.0
+    assert weak_day.state.fruit_dry_matter_g_m2 == night.state.fruit_dry_matter_g_m2
+
+    # A strong daytime hour clears the remaining deficit and finally credits fruit.
+    strong_day = model.step(weak_day.state, temp_in_c=22.0, co2_in_ppm=900.0, solar_rad_w_m2=900.0, dt_hours=1.0)
+    assert strong_day.state.respiration_deficit_g_m2 == 0.0
+    assert strong_day.state.fruit_dry_matter_g_m2 > weak_day.state.fruit_dry_matter_g_m2
+
+
+def test_warmer_nights_no_longer_increase_seasonal_yield():
+    # Regression for the exact scenario the user flagged: raising the night setpoint
+    # used to raise final yield (via the now-fixed free-respiration-loss bug). A
+    # short repeating day/night cycle at two different night temperatures should now
+    # show the opposite: the warmer night ends up with *less* fruit, not more.
+    params = _crop_params()
+
+    def run_cycle(night_temp_c: float) -> float:
+        model = TomatoCropModel(params, ground_area_m2=5000)
+        state = CropState(days_after_planting=40.0, standing_dry_matter_g_m2=500.0)
+        for _ in range(10):
+            for hour_temp, solar in [(night_temp_c, 0.0)] * 12 + [(22.0, 400.0)] * 12:
+                result = model.step(state, temp_in_c=hour_temp, co2_in_ppm=700.0, solar_rad_w_m2=solar, dt_hours=1.0)
+                state = result.state
+        return state.fruit_fresh_yield_kg_m2
+
+    cool_night_yield = run_cycle(night_temp_c=17.0)
+    warm_night_yield = run_cycle(night_temp_c=27.0)  # T_OPT_C -- maximizes respiration rate
+
+    assert warm_night_yield < cool_night_yield
+
+
 def test_canopy_assimilation_now_tracks_light_more_than_before_the_self_shading_fix():
     # The self-shading fix should widen (not narrow) the gap between low- and
     # high-light canopy assimilation, since a flat leaf-rate * LAI multiplication
