@@ -36,7 +36,12 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
         # Decided once per hour and fed to both models, so the crop's shaded light and the
         # climate model's energy balance always agree on whether the screen is deployed.
         screen_deployed = climate_model.decide_screen_deployment(
-            climate_state, hour=hour, temp_out_c=row["temp_out_c"], solar_rad_w_m2=row["solar_rad_w_m2"], dt_hours=dt_hours
+            climate_state,
+            hour=hour,
+            temp_out_c=row["temp_out_c"],
+            solar_rad_w_m2=row["solar_rad_w_m2"],
+            dt_hours=dt_hours,
+            rh_out_pct=row["rh_out_pct"],
         )
         shaded_solar_rad_w_m2 = row["solar_rad_w_m2"] * (
             1.0 - params.climate_control.screen_energy_saving_fraction if screen_deployed else 1.0
