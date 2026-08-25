@@ -357,11 +357,23 @@ function App() {
 
           <section className="chart-card">
             <h2>CO2 εσωτερικού χώρου</h2>
+            <p className="chart-card-subtitle">
+              μέσος όρος ωρών ημέρας - νύχτα ambient {result.summary.co2_ambient_ppm.toLocaleString()}ppm
+            </p>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={result.daily_series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="var(--gridline)" vertical={false} />
                 <XAxis dataKey="date" stroke="var(--muted)" tick={{ fontSize: 12 }} minTickGap={40} />
-                <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit=" ppm" width={56} />
+                <YAxis
+                  stroke="var(--muted)"
+                  tick={{ fontSize: 12 }}
+                  unit=" ppm"
+                  width={56}
+                  domain={[
+                    Math.round(result.summary.co2_ambient_ppm),
+                    Math.round(result.summary.max_co2_available_ppm),
+                  ]}
+                />
                 <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
                 <Line type="monotone" dataKey="co2_in_ppm" name="CO2" stroke="var(--series-3)" strokeWidth={2} dot={false} />
               </LineChart>

@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from twin.climate_model import CO2_DENSITY_KG_M3
 from twin.params import GreenhouseParams
 from twin.simulate import run_simulation
 
@@ -95,6 +96,18 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
     params = GreenhouseParams.from_dict(raw)
     results = run_simulation(params)
 
+    # CO2 dosing only targets co2_setpoint_day_ppm during the day -- at night the target is
+    # co2_ambient_ppm on purpose (no point enriching CO2 when there's no light for
+    # photosynthesis to use it), so a plain 24h mean always sits well below the day setpoint
+    # even when dosing hits it exactly every daytime hour. Daytime-only mean is what's
+    # actually meaningful to chart against the day setpoint.
+    daytime_mask = results["timestamp"].dt.hour.between(
+        params.climate_control.day_start_hour, params.climate_control.day_end_hour - 1
+    )
+    daytime_co2_by_day = (
+        results.loc[daytime_mask].assign(date=lambda d: d["timestamp"].dt.date).groupby("date")["co2_in_ppm"].mean()
+    )
+
     daily = (
         results.set_index("timestamp")
         .resample("1D")
@@ -102,7 +115,6 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             {
                 "temp_in_c": "mean",
                 "temp_out_c": "mean",
-                "co2_in_ppm": "mean",
                 "rh_in_pct": "mean",
                 "vpd_kpa": "mean",
                 "fruit_fresh_yield_kg_m2": "last",
@@ -116,6 +128,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
         .rename(columns={"screen_deployed": "screen_closed_hours"})
     )
     daily["screen_closed_hours"] = daily["screen_closed_hours"] * params.simulation.timestep_hours
+    daily["co2_in_ppm"] = daily["timestamp"].dt.date.map(daytime_co2_by_day)
 
     final_yield_kg_m2 = float(results["fruit_fresh_yield_kg_m2"].iloc[-1])
     # heat_used_kw is an hourly instantaneous rate; sum(kW readings) * timestep_hours gives the
@@ -125,6 +138,13 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
     total_heat_used_kwh = float(results["heat_used_kw"].sum() * params.simulation.timestep_hours)
     heat_loss_avoided_kwh = float(results["heat_loss_avoided_kw"].sum() * params.simulation.timestep_hours)
     screen_deployed_pct = float(results["screen_deployed"].mean() * 100.0)
+    # Theoretical ceiling: the ppm the CHP's full hourly CO2 output would add on top of
+    # ambient if every bit of it stayed in the greenhouse air for that hour (zero
+    # ventilation loss) -- an upper bound on what "the machine can offer", not a realistic
+    # steady-state level (real dosing also has to fight ventilation exchange).
+    max_co2_available_ppm = params.climate_control.co2_ambient_ppm + (
+        params.chp.co2_available_kg_per_hour / CO2_DENSITY_KG_M3 / params.geometry.volume_m3 * 1e6
+    )
 
     return {
         "greenhouse_name": params.name,
@@ -137,6 +157,8 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "max_heat_available_kw": params.chp.heat_available_kw,
             "heat_loss_avoided_kwh": heat_loss_avoided_kwh,
             "screen_deployed_pct": screen_deployed_pct,
+            "co2_ambient_ppm": params.climate_control.co2_ambient_ppm,
+            "max_co2_available_ppm": max_co2_available_ppm,
         },
         "daily_series": [
             {
