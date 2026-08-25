@@ -32,5 +32,6 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`thermal-screen-automatic-control-logic.md`](./thermal-screen-automatic-control-logic.md) | Screen deploy/retract logic, `chp_heat_margin_fraction`, `VENT_RAMP_BAND_C` reuse — user-specified control logic, not a literature source |
 | [`open-meteo-historical-weather-api.md`](./open-meteo-historical-weather-api.md) | `weather.source: csv_typical_year` — real weather data source for Αλεξάνδρεια Ημαθίας (script written, not yet run) |
 | [`fan-pad-evaporative-cooling.md`](./fan-pad-evaporative-cooling.md) | `climate_control.fan_pad_efficiency`, `_wet_bulb_temp_c` |
+| [`canopy-self-shading-photosynthesis.md`](./canopy-self-shading-photosynthesis.md) | `_canopy_light_response` — Beer-Lambert-integrated canopy photosynthesis fix |
 
 See [`docs/assumptions/sources.xlsx`](../docs/assumptions/sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

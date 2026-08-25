@@ -103,8 +103,32 @@ def _temperature_response(temp_c: float) -> float:
     return min(1.0, max(0.0, (num / den)))
 
 
-def _light_response(solar_rad_w_m2: float) -> float:
-    return solar_rad_w_m2 / (solar_rad_w_m2 + LIGHT_HALF_SAT_W_M2) if solar_rad_w_m2 > 0 else 0.0
+def _canopy_light_response(solar_rad_w_m2: float, lai: float) -> float:
+    """Canopy-integrated light response, replacing a flat single-leaf-rate * LAI
+    multiplication. Bug fix 2026-08-25: multiplying the top-of-canopy leaf response
+    by LAI implicitly assumed every leaf layer sees the same full incident light,
+    when lower layers are self-shaded (the same canopy this model already applies
+    Beer-Lambert attenuation to for transpiration, via canopy_interception below --
+    just not, until now, for photosynthesis). That inconsistency overestimated gross
+    assimilation at every light level, but far more at low light than high light
+    (self-shading matters less when incident light is already high enough to
+    saturate even the lower layers) -- flattening the model's seasonal light
+    sensitivity: a real 150-300 W/m2 winter-to-summer difference in average incident
+    solar only moved yield by ~37% instead of properly tracking it.
+
+    Standard result for a Michaelis-Menten leaf response f(I) = I/(I+K) under Beer's
+    law attenuation I(z) = I0*exp(-k*z) through canopy depth z in [0, LAI]:
+    integral of f(I(z)) dz, 0 to LAI = (1/k) * ln[(I0+K) / (I0*exp(-k*LAI)+K)]
+    (e.g. de Wit 1965 / Goudriaan-style integrated canopy photosynthesis). This
+    replaces a plain top-of-canopy _light_response(solar) * lai in the assimilation calculation --
+    already properly bounded (rises with LAI, saturates with light) without an
+    extra explicit LAI multiplication."""
+    if solar_rad_w_m2 <= 0 or lai <= 0:
+        return 0.0
+    k = CANOPY_LIGHT_EXTINCTION_COEFF
+    numerator = solar_rad_w_m2 + LIGHT_HALF_SAT_W_M2
+    denominator = solar_rad_w_m2 * math.exp(-k * lai) + LIGHT_HALF_SAT_W_M2
+    return (1.0 / k) * math.log(numerator / denominator)
 
 
 def _co2_response(co2_ppm: float) -> float:
@@ -185,13 +209,14 @@ class TomatoCropModel:
     ) -> CropStepResult:
         lai = _lai(self.params, state.days_after_planting, co2_in_ppm)
 
-        f_light = _light_response(solar_rad_w_m2)
+        f_light_canopy = _canopy_light_response(solar_rad_w_m2, lai)
         f_co2 = _co2_response(co2_in_ppm)
         f_temp = _temperature_response(temp_in_c)
         f_vpd = _vpd_response(vpd_kpa)
 
-        p_gross_umol_m2_leaf_s = P_MAX_UMOL_M2_LEAF_S * f_light * f_co2 * f_temp * f_vpd
-        p_gross_umol_m2_ground_s = p_gross_umol_m2_leaf_s * lai
+        # Canopy-integrated already accounts for LAI (self-shading), unlike a flat
+        # leaf-rate * LAI multiplication -- see _canopy_light_response.
+        p_gross_umol_m2_ground_s = P_MAX_UMOL_M2_LEAF_S * f_light_canopy * f_co2 * f_temp * f_vpd
 
         # mol CO2 / m2 ground / hour -> kg CO2 / m2 ground / hour
         gross_assimilation_kg_co2_m2_hour = (
