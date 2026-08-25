@@ -242,7 +242,6 @@ function App() {
   const electricityChart = (
     <ComparableChart
       title="Ηλεκτρική κατανάλωση θερμοκηπίου (μέση ισχύς/ώρα)"
-      subtitle="Αγορά από το δίκτυο — αερισμός/fan-pad + αφύγρανση. Δεν περιλαμβάνει τη θέρμανση (CHP) ή το CHP's δικό του ρεύμα, που πωλείται στο δίκτυο."
       unit=" kW"
       height={260}
       data={chartData}
@@ -250,7 +249,7 @@ function App() {
       series={buildSeries(
         [
           { key: "dehumidification_elec_kw", name: "Αφύγρανση", color: "var(--energy)" },
-          { key: "ventilation_elec_kw", name: "Αερισμός/fan-pad", color: "var(--series-1)" },
+          { key: "ventilation_elec_kw", name: "Αερισμός/fan-pad", color: "var(--series-2)" },
         ],
         isCompare,
       )}
