@@ -15,6 +15,7 @@ This folder is the audit trail for every non-obvious number in `config/greenhous
 - [`climate-control.md`](./climate-control.md) — setpoints, ventilation, CO2 dosing
 - [`crop-model.md`](./crop-model.md) — photosynthesis, growth, yield (`twin/crop_model.py`)
 - [`weather.md`](./weather.md) — synthetic weather generator, and the real "typical year" data source added 2026-08-24 (not yet active — needs `scripts/fetch_weather.py` run from an environment with internet access)
+- [`economics.md`](./economics.md) — economic layer, phase 1: physical electricity consumption (dehumidification + ventilation), not yet priced
 - [`../model-map.html`](../model-map.html) — visual wiring map of how config/weather/climate model/crop model/API/frontend connect (open in a browser; also published as a shareable [Claude artifact](https://claude.ai/code/artifact/7e7a74eb-ed2c-4a83-9a5d-b8639eedc3b5))
 
 ## Going forward
@@ -29,6 +30,7 @@ Distinct from the tables above — these are things the model doesn't attempt to
 - **Latitude-driven day length** (`twin/weather.py`) — `weather.latitude_deg` is stored but unused; the synthetic weather generator uses flat calendar-day/hour sinusoids instead of real sun-angle geometry. See `weather.md`.
 - **Fixed day/night clock window** (`climate_control.day_start_hour/day_end_hour`) — a flat 6am-8pm boundary, not tied to actual sunrise/sunset for the real site/season. See `climate-control.md`.
 - **Disease risk still not modeled** — RH/VPD now feed photosynthesis (2026-08-20, see `crop-model.md`), which is a prerequisite for a future disease-risk module (Botrytis/powdery mildew both depend heavily on RH), but that module itself doesn't exist yet.
+- **Economic layer is physical-only so far** (`economics.md`) — dehumidification and ventilation electricity are computed in kWh, but no €/kWh tariff, cost, or revenue figures exist yet; recirculation fans and fertigation pumps (both real consumers per the vendor quote) aren't modeled at all.
 
 ## Research method note
 

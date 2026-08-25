@@ -73,6 +73,21 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
         climate_state = climate_result.state
         crop_state = crop_result.state
 
+        # Electricity for the greenhouse's own two largest expected consumers (grid-purchased --
+        # the CHP's electricity is sold to the grid, not self-consumed, see
+        # docs/assumptions/economics.md). Dehumidification: tied directly to water actually removed that
+        # hour. Ventilation: only the fan-pad system's forced-air fans are priced -- passive
+        # roof-vent leakage (vent_min_ach) is naturally driven and not electrically powered.
+        dehumidification_elec_kw = (
+            climate_result.dehumidified_kg
+            * params.climate_control.dehumidification_specific_power_kwh_per_kg
+            / dt_hours
+        )
+        active_ach = climate_result.vent_ach - params.climate_control.vent_min_ach if climate_result.fan_pad_active else 0.0
+        ventilation_elec_kw = (
+            active_ach * params.geometry.volume_m3 * params.climate_control.ventilation_specific_fan_power_w_per_m3h / 1000.0
+        )
+
         records.append(
             {
                 "timestamp": row["timestamp"],
@@ -84,6 +99,8 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
                 "heat_dumped_kw": climate_result.heat_dumped_kw,
                 "screen_deployed": climate_result.screen_deployed,
                 "fan_pad_active": climate_result.fan_pad_active,
+                "dehumidification_elec_kw": dehumidification_elec_kw,
+                "ventilation_elec_kw": ventilation_elec_kw,
                 "heat_loss_avoided_kw": climate_result.heat_loss_avoided_kw,
                 "vent_ach": climate_result.vent_ach,
                 "co2_injected_kg": climate_result.co2_injected_kg,

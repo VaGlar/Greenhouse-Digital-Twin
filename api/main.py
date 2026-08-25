@@ -166,6 +166,9 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "heat_used_kw": "mean",
                 "screen_deployed": "sum",  # hours deployed that day (timestep is hourly)
                 "fan_pad_active": "sum",  # hours engaged that day (timestep is hourly)
+                # Daily-average power draw (kW) -- same normalization as heat_used_kw above.
+                "dehumidification_elec_kw": "mean",
+                "ventilation_elec_kw": "mean",
             }
         )
         .reset_index()
@@ -184,6 +187,11 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
     heat_loss_avoided_kwh = float(results["heat_loss_avoided_kw"].sum() * params.simulation.timestep_hours)
     screen_deployed_pct = float(results["screen_deployed"].mean() * 100.0)
     fan_pad_active_pct = float(results["fan_pad_active"].mean() * 100.0)
+    # Grid-purchased electricity for the greenhouse's own consumption -- the CHP's electricity is
+    # sold to the grid, not netted against this (see docs/assumptions/economics.md).
+    total_dehumidification_elec_kwh = float(results["dehumidification_elec_kw"].sum() * params.simulation.timestep_hours)
+    total_ventilation_elec_kwh = float(results["ventilation_elec_kw"].sum() * params.simulation.timestep_hours)
+    total_electricity_kwh = total_dehumidification_elec_kwh + total_ventilation_elec_kwh
     # Theoretical ceiling: the ppm the CHP's full hourly CO2 output would add on top of
     # ambient if every bit of it stayed in the greenhouse air for that hour (zero
     # ventilation loss) -- an upper bound on what "the machine can offer", not a realistic
@@ -204,6 +212,9 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "heat_loss_avoided_kwh": heat_loss_avoided_kwh,
             "screen_deployed_pct": screen_deployed_pct,
             "fan_pad_active_pct": fan_pad_active_pct,
+            "total_dehumidification_elec_kwh": total_dehumidification_elec_kwh,
+            "total_ventilation_elec_kwh": total_ventilation_elec_kwh,
+            "total_electricity_kwh": total_electricity_kwh,
             "co2_ambient_ppm": params.climate_control.co2_ambient_ppm,
             "max_co2_available_ppm": max_co2_available_ppm,
         },
@@ -219,6 +230,8 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "heat_used_kw": round(row.heat_used_kw, 1),
                 "screen_closed_hours": round(row.screen_closed_hours, 1),
                 "fan_pad_active_hours": round(row.fan_pad_active_hours, 1),
+                "dehumidification_elec_kw": round(row.dehumidification_elec_kw, 2),
+                "ventilation_elec_kw": round(row.ventilation_elec_kw, 2),
             }
             for row in daily.itertuples()
         ],

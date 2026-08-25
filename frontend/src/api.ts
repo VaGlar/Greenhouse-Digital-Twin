@@ -62,6 +62,10 @@ export interface DailyPoint {
   screen_closed_hours: number;
   /** Hours that day fan-pad cooling was engaged (fully automatic — see backend). */
   fan_pad_active_hours: number;
+  /** Daily-average electric power (kW) drawn by active dehumidification. */
+  dehumidification_elec_kw: number;
+  /** Daily-average electric power (kW) drawn by the fan-pad system's forced-air fans. */
+  ventilation_elec_kw: number;
 }
 
 export interface SimulationResult {
@@ -76,6 +80,9 @@ export interface SimulationResult {
     heat_loss_avoided_kwh: number;
     screen_deployed_pct: number;
     fan_pad_active_pct: number;
+    total_dehumidification_elec_kwh: number;
+    total_ventilation_elec_kwh: number;
+    total_electricity_kwh: number;
     co2_ambient_ppm: number;
     max_co2_available_ppm: number;
   };
