@@ -131,6 +131,12 @@ class ClimateControlParams:
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
             raise ValueError("day_start_hour/day_end_hour must be within [0, 24]")
+        if self.heating_setpoint_day_c < self.heating_setpoint_night_c:
+            raise ValueError("heating_setpoint_day_c must be >= heating_setpoint_night_c")
+        if self.co2_ambient_ppm < 0:
+            raise ValueError("co2_ambient_ppm must be >= 0")
+        if self.co2_setpoint_day_ppm < self.co2_ambient_ppm:
+            raise ValueError("co2_setpoint_day_ppm must be >= co2_ambient_ppm")
         if not 0 < self.chp_heat_margin_fraction <= 1:
             raise ValueError("chp_heat_margin_fraction must be in (0, 1]")
         if self.vent_max_ach < self.vent_min_ach:
