@@ -116,13 +116,17 @@ class ClimateControlParams:
     # PLACEHOLDER: real removal capacity of the active dehumidification system (represents the
     # real quote's OptiClima cooling/dehumidification panels -- no capacity spec was in that
     # quote). Added 2026-08-25 to replace the earlier "unconstrained, always reaches setpoint"
-    # simplification. Sourced to comparable real systems, not this specific (not-yet-installed)
-    # unit: a commercial greenhouse dehumidifier (DryGair DG-12) removes up to 48 kg/hour, and a
-    # semi-closed greenhouse cooling/dehumidification system was measured removing ~75 kg/hour --
-    # 75 sits at the upper end of that range, appropriate for a system this greenhouse's size
-    # (~5000 m2). See docs/assumptions/climate-control.md and
-    # docs/papers/greenhouse-dehumidification-capacity.md.
-    dehumidification_capacity_kg_water_per_hour: float = 75.0
+    # simplification. Revised same day: an initial 75 kg/hour estimate (sourced to a small
+    # portable unit, DryGair DG-12) turned out to be a scale mismatch -- that unit covers
+    # ~3,700 m2, well under this greenhouse's 5000 m2, and the quote actually describes a full
+    # "semi-closed greenhouse climate system" (OptiClima, EUR195,000), not a bolt-on portable
+    # dehumidifier. Rescaled from a semi-closed greenhouse *cooling capacity* benchmark instead
+    # (350 W/m2, mid-range of a 150-700 W/m2 reported span) x 5000 m2 x an assumed ~30% of that
+    # cooling capacity going to latent (moisture-condensing) load rather than sensible heat
+    # removal -- a typical order of magnitude for a dehumidification-focused duty cycle, not a
+    # measured split for this system -- giving ~770 kg/hour. See
+    # docs/assumptions/climate-control.md and docs/papers/greenhouse-dehumidification-capacity.md.
+    dehumidification_capacity_kg_water_per_hour: float = 771.0
     # Initial config choice, off by default: does this greenhouse have a fan-and-pad
     # evaporative cooling system? When enabled, air drawn in by active ventilation is
     # first pre-cooled (and humidified) by passing through wet pads before entering the

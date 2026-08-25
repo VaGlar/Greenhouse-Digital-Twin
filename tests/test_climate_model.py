@@ -238,14 +238,15 @@ def test_fan_pad_cooling_disengaged_when_toggle_is_off_even_if_efficiency_is_set
 
 
 def test_active_dehumidification_caps_relative_humidity_at_setpoint():
-    # Moderate demand, within the default 75 kg/hour capacity -- reaches the setpoint.
+    # Demand comfortably within the default (~771 kg/hour) capacity -- reaches the setpoint.
     geometry = _geometry()
     control = _control()  # dehumidification_setpoint_pct defaults to 70.0
     chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
     model = GreenhouseClimateModel(geometry, chp, control)
 
-    humid_state = ClimateState(temp_in_c=20.0, co2_in_ppm=420.0, vapor_pressure_kpa=1.68)
-    result = model.step(humid_state, hour=2, temp_out_c=18.0, solar_rad_w_m2=0.0, dt_hours=1.0, rh_out_pct=95.0)
+    # push vapor pressure near saturation; humid, still outdoor air (little ventilation relief)
+    saturated_state = ClimateState(temp_in_c=20.0, co2_in_ppm=420.0, vapor_pressure_kpa=2.3)
+    result = model.step(saturated_state, hour=2, temp_out_c=18.0, solar_rad_w_m2=0.0, dt_hours=1.0, rh_out_pct=95.0)
 
     assert result.rh_in_pct <= control.dehumidification_setpoint_pct + 0.01
     assert result.dehumidified_kg > 0.0
@@ -256,13 +257,19 @@ def test_dehumidification_is_capped_by_real_capacity_under_extreme_demand():
     # Bug fix 2026-08-25: active dehumidification used to be unconstrained (always assumed
     # sufficient to reach the setpoint within the hour). Under demand that exceeds the real
     # removal capacity, the setpoint should NOT be fully reached -- the RH ceiling from
-    # earlier is now a target, not a guarantee.
+    # earlier is now a target, not a guarantee. Uses an explicitly small capacity here (rather
+    # than the ~771 kg/hour default, sized for a real 5000 m2 semi-closed system, which a
+    # single hour's demand in this small test fixture can't realistically exceed) to isolate
+    # the capping behavior itself.
     geometry = _geometry()
-    control = _control()
+    control = ClimateControlParams(
+        heating_setpoint_day_c=20.0,
+        heating_setpoint_night_c=17.0,
+        dehumidification_capacity_kg_water_per_hour=50.0,
+    )
     chp = CHPParams(electric_power_kw=1000, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
     model = GreenhouseClimateModel(geometry, chp, control)
 
-    # push vapor pressure near saturation; humid, still outdoor air (little ventilation relief)
     saturated_state = ClimateState(temp_in_c=20.0, co2_in_ppm=420.0, vapor_pressure_kpa=2.3)
     result = model.step(saturated_state, hour=2, temp_out_c=18.0, solar_rad_w_m2=0.0, dt_hours=1.0, rh_out_pct=95.0)
 
