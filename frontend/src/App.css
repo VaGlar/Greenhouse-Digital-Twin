@@ -228,6 +228,108 @@ body {
   line-height: 1.45;
 }
 
+.side-field-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+/* ── Gauges (CHP power draw, screen deployment) ── */
+.gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gauge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.gauge-label {
+  color: var(--text-secondary);
+}
+
+.gauge-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gauge-track {
+  height: 8px;
+  border-radius: 1px;
+  background: var(--page);
+  border: 1px solid var(--gridline);
+  overflow: hidden;
+}
+
+.gauge-fill {
+  height: 100%;
+  background: var(--energy);
+}
+
+.gauge-fill.screen {
+  background: var(--humidity);
+}
+
+/* ── Crop phase timeline ── */
+.phase-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.phase-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 1px;
+  overflow: hidden;
+  border: 1px solid var(--gridline);
+}
+
+.phase-segment.veg {
+  background: color-mix(in srgb, var(--series-3) 35%, transparent);
+}
+
+.phase-segment.ramp {
+  background: color-mix(in srgb, var(--series-3) 65%, transparent);
+}
+
+.phase-segment.full {
+  background: var(--series-3);
+}
+
+.phase-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.phase-legend .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+.phase-legend .dot.veg {
+  background: color-mix(in srgb, var(--series-3) 35%, transparent);
+}
+
+.phase-legend .dot.ramp {
+  background: color-mix(in srgb, var(--series-3) 65%, transparent);
+}
+
+.phase-legend .dot.full {
+  background: var(--series-3);
+}
+
 /* ── Read-only spec lists (θερμοκήπιο / καιρός tabs) ── */
 .spec-list {
   margin: 0;
