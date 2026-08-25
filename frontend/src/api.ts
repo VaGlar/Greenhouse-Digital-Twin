@@ -35,6 +35,9 @@ export interface DailyPoint {
   date: string;
   temp_in_c: number;
   temp_out_c: number;
+  /** Daytime-only average (day_start_hour-day_end_hour) — the CO2 dosing target only applies
+   * during the day, so a full 24h mean would misleadingly blend it with the night's
+   * intentionally-lower ambient target. */
   co2_in_ppm: number;
   rh_in_pct: number;
   vpd_kpa: number;
@@ -56,6 +59,8 @@ export interface SimulationResult {
     max_heat_available_kw: number;
     heat_loss_avoided_kwh: number;
     screen_deployed_pct: number;
+    co2_ambient_ppm: number;
+    max_co2_available_ppm: number;
   };
   daily_series: DailyPoint[];
 }
