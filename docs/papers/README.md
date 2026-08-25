@@ -34,5 +34,7 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`fan-pad-evaporative-cooling.md`](./fan-pad-evaporative-cooling.md) | `climate_control.fan_pad_efficiency`, `_wet_bulb_temp_c` |
 | [`canopy-self-shading-photosynthesis.md`](./canopy-self-shading-photosynthesis.md) | `_canopy_light_response` — Beer-Lambert-integrated canopy photosynthesis fix |
 | [`tomato-fruit-set-temperature-sensitivity.md`](./tomato-fruit-set-temperature-sensitivity.md) | `FRUIT_SET_T_MIN_C`, `FRUIT_SET_T_OPT_C`, `FRUIT_SET_T_MAX_C` |
+| [`greenhouse-dehumidification-capacity.md`](./greenhouse-dehumidification-capacity.md) | `climate_control.dehumidification_capacity_kg_water_per_hour` |
+| [`tomato-crop-cycle-duration.md`](./tomato-crop-cycle-duration.md) | `simulation.duration_days` |
 
 See [`docs/sources.xlsx`](../sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

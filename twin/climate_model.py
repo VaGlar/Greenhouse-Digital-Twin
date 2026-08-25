@@ -336,17 +336,25 @@ class GreenhouseClimateModel:
             GAS_CONSTANT_J_MOL_K * temp_in_kelvin
         ) * self.geometry.volume_m3 * WATER_MOLAR_MASS_G_MOL / 1000.0
 
-        # --- Active dehumidification: idealized setpoint controller (representing the
-        # OptiClima cooling/dehumidification panels) -- brings RH down to its target
-        # ceiling. Capacity is NOT modeled (no real spec available for this system);
-        # treated as always sufficient to reach the setpoint. Replace with a real
-        # capacity limit once the vendor's dehumidification unit spec is known.
+        # --- Active dehumidification: setpoint controller (representing the OptiClima
+        # cooling/dehumidification panels) that removes moisture toward its target ceiling,
+        # capped at a real removal capacity (dehumidification_capacity_kg_water_per_hour).
+        # Bug fix 2026-08-25: previously unconstrained (always assumed sufficient to reach
+        # the setpoint in a single hour) -- no real spec was available for this system, so
+        # this is a PLACEHOLDER capacity sourced to comparable real systems, not a measured
+        # spec for this exact unit. See docs/assumptions/climate-control.md.
         saturation_kpa = _saturation_vapor_pressure_kpa(temp_new)
         dehum_target_kpa = saturation_kpa * self.control.dehumidification_setpoint_pct / 100.0
-        vapor_after_dehum = min(vapor_after_condensation, dehum_target_kpa)
-        dehumidified_kg = max(0.0, vapor_after_condensation - vapor_after_dehum) * 1000.0 / (
+        demanded_removal_kpa = max(0.0, vapor_after_condensation - dehum_target_kpa)
+        demanded_kg = demanded_removal_kpa * 1000.0 / (
             GAS_CONSTANT_J_MOL_K * temp_in_kelvin
         ) * self.geometry.volume_m3 * WATER_MOLAR_MASS_G_MOL / 1000.0
+        max_removal_kg = self.control.dehumidification_capacity_kg_water_per_hour * dt_hours
+        dehumidified_kg = min(demanded_kg, max_removal_kg)
+        removed_kpa = dehumidified_kg * 1000.0 / WATER_MOLAR_MASS_G_MOL * GAS_CONSTANT_J_MOL_K * temp_in_kelvin / (
+            self.geometry.volume_m3 * 1000.0
+        )
+        vapor_after_dehum = vapor_after_condensation - removed_kpa
 
         vapor_new = min(vapor_after_dehum, saturation_kpa)  # final safety cap at 100% RH
 

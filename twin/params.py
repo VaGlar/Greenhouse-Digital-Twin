@@ -113,6 +113,16 @@ class ClimateControlParams:
     # the optimum for pollination (>80% pollen clumps together; <60% stigma dries out) -- used as
     # the single setpoint. See docs/assumptions/climate-control.md.
     dehumidification_setpoint_pct: float = 70.0
+    # PLACEHOLDER: real removal capacity of the active dehumidification system (represents the
+    # real quote's OptiClima cooling/dehumidification panels -- no capacity spec was in that
+    # quote). Added 2026-08-25 to replace the earlier "unconstrained, always reaches setpoint"
+    # simplification. Sourced to comparable real systems, not this specific (not-yet-installed)
+    # unit: a commercial greenhouse dehumidifier (DryGair DG-12) removes up to 48 kg/hour, and a
+    # semi-closed greenhouse cooling/dehumidification system was measured removing ~75 kg/hour --
+    # 75 sits at the upper end of that range, appropriate for a system this greenhouse's size
+    # (~5000 m2). See docs/assumptions/climate-control.md and
+    # docs/papers/greenhouse-dehumidification-capacity.md.
+    dehumidification_capacity_kg_water_per_hour: float = 75.0
     # Initial config choice, off by default: does this greenhouse have a fan-and-pad
     # evaporative cooling system? When enabled, air drawn in by active ventilation is
     # first pre-cooled (and humidified) by passing through wet pads before entering the
@@ -143,6 +153,8 @@ class ClimateControlParams:
             raise ValueError("vent_max_ach must be >= vent_min_ach")
         if not 0 < self.fan_pad_efficiency <= 1:
             raise ValueError("fan_pad_efficiency must be in (0, 1]")
+        if self.dehumidification_capacity_kg_water_per_hour <= 0:
+            raise ValueError("dehumidification_capacity_kg_water_per_hour must be > 0")
         if self.effective_heat_capacity_j_m2k <= 0:
             raise ValueError("effective_heat_capacity_j_m2k must be > 0")
         if not 0 <= self.cover_surface_temp_fraction <= 1:
@@ -212,7 +224,8 @@ class WeatherParams:
 @dataclass
 class SimulationParams:
     start_date: date
-    duration_days: int = 120
+    duration_days: int = 330  # SOURCED: real commercial indeterminate greenhouse tomato cropping
+    # cycles run ~10-11 months before replanting. See docs/assumptions/crop-model.md.
     timestep_hours: float = 1.0
 
     def __post_init__(self) -> None:

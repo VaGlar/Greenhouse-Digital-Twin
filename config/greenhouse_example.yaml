@@ -43,7 +43,10 @@ climate_control:
                                      # docs/assumptions/climate-control.md. Deployment is fully automatic
                                      # (night / too-hot / cold-with-net-benefit), not user-configurable.
   dehumidification_setpoint_pct: 70.0   # SOURCED: pollination optimum for greenhouse tomato RH
-                                         # (docs/papers/greenhouse-tomato-optimal-rh.md); active dehum. modeled as unconstrained
+                                         # (docs/papers/greenhouse-tomato-optimal-rh.md)
+  dehumidification_capacity_kg_water_per_hour: 75.0  # PLACEHOLDER: no capacity spec in the real
+                                         # quote -- sourced to comparable real systems, see
+                                         # docs/papers/greenhouse-dehumidification-capacity.md
   fan_pad_cooling_enabled: true    # Initial config choice: does this greenhouse have fan-and-pad
                                      # evaporative cooling? Enabled for this greenhouse -- see docs/assumptions/climate-control.md
   fan_pad_efficiency: 0.80         # SOURCED: UF/IFAS Extension CIR1135/AE069, up to 85% for a well-maintained
@@ -79,5 +82,7 @@ weather:
 
 simulation:
   start_date: 2026-09-15
-  duration_days: 150
+  duration_days: 330   # SOURCED: real commercial indeterminate greenhouse tomato cropping cycles
+                        # run ~10-11 months before replanting -- the plant itself has no natural
+                        # end-of-life (indeterminate growth). See docs/assumptions/crop-model.md.
   timestep_hours: 1.0
