@@ -139,3 +139,30 @@ def test_simulate_rejects_non_integer_duration_days():
 def test_simulate_rejects_malformed_start_date():
     response = client.post("/simulate", json={"start_date": "not-a-date"})
     assert response.status_code == 422
+
+
+# -- /weather_preview: lightweight preview for the weather tab, no climate/crop model --
+
+
+def test_weather_preview_with_no_overrides_uses_backend_config_defaults():
+    response = client.get("/weather_preview")
+    assert response.status_code == 200
+    body = response.json()
+    assert "daily_series" in body
+    row = body["daily_series"][0]
+    assert "date" in row
+    assert "temp_out_c" in row
+    assert "solar_rad_w_m2" in row
+
+
+def test_weather_preview_duration_override_shortens_the_series():
+    response = client.get("/weather_preview", params={"duration_days": 5})
+    assert response.status_code == 200
+    assert len(response.json()["daily_series"]) == 5
+
+
+def test_weather_preview_start_date_override_is_reflected():
+    response = client.get("/weather_preview", params={"start_date": "2027-01-01", "duration_days": 2})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["daily_series"][0]["date"] == "2027-01-01"

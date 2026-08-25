@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from twin.climate_model import CO2_DENSITY_KG_M3
 from twin.params import GreenhouseParams
 from twin.simulate import run_simulation
+from twin.weather import load_weather
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config" / "greenhouse_example.yaml"
@@ -57,6 +58,37 @@ def get_config() -> dict:
     with open(DEFAULT_CONFIG_PATH, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
     return _json_safe(raw)
+
+
+@app.get("/weather_preview")
+def weather_preview(start_date: date | None = None, duration_days: int | None = None) -> dict:
+    """Daily-mean outdoor temperature/solar radiation for the weather tab, so the
+    user can see what the selected source/period looks like before spending time
+    on a full climate+crop run. Just the weather loader (twin/weather.py) --
+    no climate model, no crop model, effectively free to compute.
+    """
+    with open(DEFAULT_CONFIG_PATH, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+    params = GreenhouseParams.from_dict(raw)
+    effective_start = start_date if start_date is not None else params.simulation.start_date
+    effective_duration = duration_days if duration_days is not None else params.simulation.duration_days
+    df = load_weather(params.weather, effective_start, effective_duration, params.simulation.timestep_hours)
+    daily = (
+        df.set_index("timestamp")
+        .resample("1D")
+        .agg({"temp_out_c": "mean", "solar_rad_w_m2": "mean"})
+        .reset_index()
+    )
+    return {
+        "daily_series": [
+            {
+                "date": row.timestamp.date().isoformat(),
+                "temp_out_c": round(row.temp_out_c, 2),
+                "solar_rad_w_m2": round(row.solar_rad_w_m2, 1),
+            }
+            for row in daily.itertuples()
+        ]
+    }
 
 
 class SimulateRequest(BaseModel):

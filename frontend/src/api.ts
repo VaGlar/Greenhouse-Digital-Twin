@@ -79,6 +79,16 @@ export interface SimulationResult {
   daily_series: DailyPoint[];
 }
 
+export interface WeatherPreviewPoint {
+  date: string;
+  temp_out_c: number;
+  solar_rad_w_m2: number;
+}
+
+export interface WeatherPreview {
+  daily_series: WeatherPreviewPoint[];
+}
+
 export interface SimulationOverrides {
   start_date?: string;
   duration_days?: number;
@@ -108,4 +118,12 @@ export function runSimulation(overrides: SimulationOverrides = {}): Promise<Simu
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(overrides),
   });
+}
+
+export function getWeatherPreview(startDate?: string, durationDays?: number): Promise<WeatherPreview> {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (durationDays) params.set("duration_days", String(durationDays));
+  const query = params.toString();
+  return getJson<WeatherPreview>(`/weather_preview${query ? `?${query}` : ""}`);
 }

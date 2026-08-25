@@ -356,6 +356,19 @@ body {
   padding-top: 10px;
 }
 
+.spec-section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.spec-section-label:first-child {
+  margin-top: 0;
+}
+
 .spec-row dt {
   font-size: 0.78rem;
   color: var(--text-secondary);
@@ -478,6 +491,22 @@ body {
 .run-button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.secondary-button {
+  background: var(--page);
+  color: var(--text-primary);
+  border: 1px solid var(--gridline);
+  border-radius: 2px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.secondary-button:hover {
+  background: var(--surface-2);
 }
 
 .error {
