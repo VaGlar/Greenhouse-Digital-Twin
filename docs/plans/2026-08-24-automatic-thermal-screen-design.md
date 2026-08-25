@@ -4,7 +4,7 @@
 
 ## Background
 
-The screen was previously deployed on a fixed clock schedule (`screen_open_hour`/`screen_close_hour`), user-adjustable in the frontend. Investigation (2026-08-24) showed that sweeping this schedule produces small, non-monotonic yield swings (~1-3% over a 150-day run) via an indirect temp→humidity→VPD→photosynthesis pathway on hours when the CHP isn't actively heating — not a coding bug, but confirmed the screen's real-world control logic is time-based *and* condition-based, and that the model was missing the screen's shading effect entirely (it only reduced transmission heat loss, never solar gain/light, despite the real product being a combined "55% shading / 55% energy saving" screen — `papers/geothermiki-s192g-quote.md`).
+The screen was previously deployed on a fixed clock schedule (`screen_open_hour`/`screen_close_hour`), user-adjustable in the frontend. Investigation (2026-08-24) showed that sweeping this schedule produces small, non-monotonic yield swings (~1-3% over a 150-day run) via an indirect temp→humidity→VPD→photosynthesis pathway on hours when the CHP isn't actively heating — not a coding bug, but confirmed the screen's real-world control logic is time-based *and* condition-based, and that the model was missing the screen's shading effect entirely (it only reduced transmission heat loss, never solar gain/light, despite the real product being a combined "55% shading / 55% energy saving" screen — `docs/papers/geothermiki-s192g-quote.md`).
 
 The user described the real control logic: the screen closes at night, when it's very hot (shade), or when it's very cold and the CHP can't keep up (insulate, even at the cost of some lost sun) — and confirmed shading must now be modeled.
 
@@ -38,8 +38,8 @@ Whenever deployed, the screen always applies **both** effects simultaneously (sa
 ## Documentation
 
 - `docs/assumptions/climate-control.md`: rewrite the `screen_energy_saving_fraction` entry to describe the new automatic 3-criteria logic (replacing the `screen_open_hour`/`screen_close_hour` entry, which is removed) and to note the same 55% figure now governs shading too, per the vendor spec's own wording. Add a new entry for `chp_heat_margin_fraction` (0.9, PLACEHOLDER — a safety-margin choice, not literature-sourced).
-- New `papers/` citation card documenting the control-logic design decision itself (references this design doc + the vendor quote's "55% shading, ~55% energy saving" line already captured in `geothermiki-s192g-quote.md`).
-- `docs/assumptions/sources.xlsx`: add the new `chp_heat_margin_fraction` row.
+- New `docs/papers/` citation card documenting the control-logic design decision itself (references this design doc + the vendor quote's "55% shading, ~55% energy saving" line already captured in `geothermiki-s192g-quote.md`).
+- `docs/sources.xlsx` (was `docs/assumptions/sources.xlsx` at the time this plan was written): add the new `chp_heat_margin_fraction` row.
 - `docs/plans/2026-08-21-greenhouse-schematic-frontend-design.md`'s zone table (screen → schedule sliders) is now stale for the screen row; update it to reflect the automatic behavior instead of user-adjustable hours.
 
 ## Testing

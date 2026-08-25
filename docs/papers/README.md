@@ -4,7 +4,7 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 
 **If you want a local PDF copy:** open the URL in the citation card and save it yourself (browser "Print to PDF" or the site's download button) — drop it in this folder next to its citation card, same filename with `.pdf` instead of `.md`. Several of these sit behind ResearchGate/ScienceDirect logins that a plain fetch can't get past anyway, so a manual download is often the only way to get the actual PDF regardless of this environment's restrictions.
 
-**Naming convention:** `<short-slug>.md`, referenced by that slug from `docs/assumptions/*.md` and from `docs/assumptions/sources.xlsx`.
+**Naming convention:** `<short-slug>.md`, referenced by that slug from `docs/assumptions/*.md` and from `docs/sources.xlsx`.
 
 | File | Used for |
 |---|---|
@@ -35,4 +35,4 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`canopy-self-shading-photosynthesis.md`](./canopy-self-shading-photosynthesis.md) | `_canopy_light_response` — Beer-Lambert-integrated canopy photosynthesis fix |
 | [`tomato-fruit-set-temperature-sensitivity.md`](./tomato-fruit-set-temperature-sensitivity.md) | `FRUIT_SET_T_MIN_C`, `FRUIT_SET_T_OPT_C`, `FRUIT_SET_T_MAX_C` |
 
-See [`docs/assumptions/sources.xlsx`](../docs/assumptions/sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.
+See [`docs/sources.xlsx`](../sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

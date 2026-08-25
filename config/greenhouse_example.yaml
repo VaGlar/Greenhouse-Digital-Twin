@@ -9,12 +9,12 @@ geometry:
                                   # distinct from the real quote's own conflicting 5280/6393 m2 figures (see below)
   height_m: 5.67                 # SOURCED: derived average height for a Gothic-arch bay, real quote geometry
                                   # (Geothermiki S192G, 5-bay x 9.6m, side 4.0m, ridge 6.5m) — avg = side + rise*(2/3)
-                                  # for a circular-arc roof; see papers/geothermiki-s192g-quote.md
+                                  # for a circular-arc roof; see docs/papers/geothermiki-s192g-quote.md
   cover_u_value_w_m2k: 4.4       # SOURCED: real cover material is double-inflated PE (not single glass) — U-value
-                                  # for double-layer inflated PE with air gap; papers/tunnelvisionhoops-double-layer.md
+                                  # for double-layer inflated PE with air gap; docs/papers/tunnelvisionhoops-double-layer.md
                                   # (caveat: that source's PE is 1mm thick vs. our film's 180 micron — best figure found)
   cover_transmissivity: 0.90     # SOURCED: 180-micron thermal/anti-drip greenhouse film, 88-92% PAR transmission
-                                  # (matches the real quote's cover spec); papers/greenhouse-film-180micron-transmission.md
+                                  # (matches the real quote's cover spec); docs/papers/greenhouse-film-180micron-transmission.md
   cover_area_factor: 1.45        # SOURCED: computed from real arch geometry (5 bays x 9.6m chord, 2.5m rise, 100m
                                   # length, 4.0m side walls) — see docs/assumptions/geometry-and-chp.md for the derivation
 
@@ -34,16 +34,16 @@ climate_control:
   vent_max_ach: 15.0               # PLACEHOLDER: plausible order of magnitude, not benchmarked to real vent design
   vent_min_ach: 0.5                # PLACEHOLDER: generic baseline leakage assumption
   co2_setpoint_day_ppm: 700.0       # SOURCED: corrected from 900 -- specific study testing 500/700/850/1000ppm
-                                     # found 700ppm optimal, no yield benefit above it (papers/tomato-co2-optimum-700ppm.md)
+                                     # found 700ppm optimal, no yield benefit above it (docs/papers/tomato-co2-optimum-700ppm.md)
   co2_ambient_ppm: 420.0           # SOURCED, factual: current global atmospheric CO2 (~420-425ppm, NOAA/Mauna Loa)
   effective_heat_capacity_j_m2k: 40000.0  # PLACEHOLDER: lumped single-zone thermal mass estimate, not measured
   screen_energy_saving_fraction: 0.55  # SOURCED: real thermal screen spec (type PH55) — 55% shading AND
-                                         # ~55% energy saving, same fabric (papers/geothermiki-s192g-quote.md)
+                                         # ~55% energy saving, same fabric (docs/papers/geothermiki-s192g-quote.md)
   chp_heat_margin_fraction: 0.9    # PLACEHOLDER: safety margin for the screen's cold-trigger — see
                                      # docs/assumptions/climate-control.md. Deployment is fully automatic
                                      # (night / too-hot / cold-with-net-benefit), not user-configurable.
   dehumidification_setpoint_pct: 70.0   # SOURCED: pollination optimum for greenhouse tomato RH
-                                         # (papers/greenhouse-tomato-optimal-rh.md); active dehum. modeled as unconstrained
+                                         # (docs/papers/greenhouse-tomato-optimal-rh.md); active dehum. modeled as unconstrained
   fan_pad_cooling_enabled: true    # Initial config choice: does this greenhouse have fan-and-pad
                                      # evaporative cooling? Enabled for this greenhouse -- see docs/assumptions/climate-control.md
   fan_pad_efficiency: 0.80         # SOURCED: UF/IFAS Extension CIR1135/AE069, up to 85% for a well-maintained
@@ -68,7 +68,7 @@ hydroponic:
 weather:
   source: "csv_typical_year"   # SOURCED: real 10-year (2015-2024) hourly average for Αλεξάνδρεια Ημαθίας, via the
                                 # Open-Meteo Historical Weather API — see docs/assumptions/weather.md,
-                                # papers/open-meteo-historical-weather-api.md. Replaces the synthetic sine-wave
+                                # docs/papers/open-meteo-historical-weather-api.md. Replaces the synthetic sine-wave
                                 # generator below, which is kept only as source: "synthetic" fallback values.
   csv_path: config/weather/alexandreia-imathias-typical-year.csv
   latitude_deg: 40.63          # SITE-SPECIFIC: Αλεξάνδρεια Ημαθίας — still unused by the model's math (see weather.md)
