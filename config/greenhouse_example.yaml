@@ -44,8 +44,9 @@ climate_control:
                                      # (night / too-hot / cold-with-net-benefit), not user-configurable.
   dehumidification_setpoint_pct: 70.0   # SOURCED: pollination optimum for greenhouse tomato RH
                                          # (docs/papers/greenhouse-tomato-optimal-rh.md)
-  dehumidification_capacity_kg_water_per_hour: 75.0  # PLACEHOLDER: no capacity spec in the real
-                                         # quote -- sourced to comparable real systems, see
+  dehumidification_capacity_kg_water_per_hour: 771.0  # PLACEHOLDER: no capacity spec in the real
+                                         # quote -- rescaled from a full semi-closed climate
+                                         # system's cooling capacity, see
                                          # docs/papers/greenhouse-dehumidification-capacity.md
   fan_pad_cooling_enabled: true    # Initial config choice: does this greenhouse have fan-and-pad
                                      # evaporative cooling? Enabled for this greenhouse -- see docs/assumptions/climate-control.md
