@@ -3,7 +3,8 @@
 - **Type:** Web search aggregation (commercial product spec + measured fan benchmarks)
 - **Retrieved:** 2026-08-25, via web search
 - **Used for:** `twin/params.py` (`ClimateControlParams.dehumidification_specific_power_kwh_per_kg`,
-  `ClimateControlParams.ventilation_specific_fan_power_w_per_m3h`)
+  `ClimateControlParams.ventilation_specific_fan_power_w_per_m3h`,
+  `ClimateControlParams.recirculation_fan_power_kw`)
 
 ## Context
 
@@ -58,3 +59,49 @@ own forced-air fans, per the model's existing `fan_pad_cooling_enabled` toggle.
 
 **SOURCED** to real, if generic, product benchmarks for both figures — not measured specs for
 this specific greenhouse's actual installed equipment. See `docs/assumptions/economics.md`.
+
+## Recirculation (HAF) fan bank: how many, and how big
+
+The vendor quote's ACF21 spec (508mm/20" diameter, 5,400 m³/h) matches real 20" HAF
+circulation fans:
+
+> HAF20110C: 1/10 HP, 115v, 1725 RPM, 2600 CFM. F5 Fans 20-inch: 1/3HP, 5470 CFM, 1725 RPM.
+> Green Breeze HAF Fan: 20" diameter, 3,650 CFM, 1/3 HP.
+
+Source: Griffin Greenhouse Supplies, F5 Fans, and J&D Manufacturing product listings (via web
+search). Converting each to specific power (W ÷ m³/h) gives a range of **≈0.017–0.04 W/(m³/h)**
+— a similar efficiency range to the exhaust/fan-pad fans above, on the more-efficient end since
+HAF fans work against much lower static pressure than exhaust fans pushing air through vents or
+wet pads:
+
+> HAF fans are generally more energy-efficient than exhaust fans because they operate against
+> low static pressure.
+
+Source: aggregated from HAF-vs-exhaust-fan comparison articles (Bluelab, Rimol) via web search.
+
+The quote gives no fan count for its "air recirculation" (€7,500) line item. The user shared the
+quote's own fan-layout diagram — a racetrack circulation pattern (fans in each bay row blowing
+alternating directions, air looping back via the next bay) — but its "≶" break symbols are a
+standard drawing convention meaning the pattern repeats along the greenhouse's length, not a
+literal count of the few fans drawn. So the diagram confirms the topology (one fan row per bay)
+rather than giving a count directly. Estimated instead from real HAF spacing guidance:
+
+> As a general guideline, one fan is required every 50 feet, with subsequent fans located 40'
+> to 50' apart to keep the air mass moving.
+
+Source: aggregated HAF installation guidance (Rimol, Farm Energy Extension) via web search.
+
+Applied to this greenhouse's real geometry (5 bays × 100m length, from
+`geothermiki-s192g-quote.md`): ~100m ÷ ~14m spacing ≈ **7 fans per row** (one row per bay) × **5
+rows** = **35 fans**. At 5,400 m³/h each × an assumed 0.025 W/(m³/h) specific power (middle of the
+measured range above): 35 × 5,400 × 0.025 / 1000 ≈ **4.7 kW** combined electrical draw when
+running.
+
+A generic commercial "8-10 CFM per square foot of floor area" sizing rule was also found and
+explicitly **rejected**: applied to this greenhouse's ~53,800 sq ft floor area it implies ~146
+fans, an implausible fan count for a real installation — the greenhouse-specific spacing rule
+above is a much better fit for HAF fans specifically (that generic CFM/sq ft figure appears
+intended for a different context, e.g. general air-exchange sizing, not HAF circulation density).
+
+**PLACEHOLDER**: an estimated fan count/power, not a real spec for this installation's actual
+recirculation fan bank. See `docs/assumptions/economics.md`.

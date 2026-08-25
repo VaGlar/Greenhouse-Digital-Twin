@@ -66,6 +66,7 @@ def test_simulate_response_has_expected_summary_fields():
         "fan_pad_active_pct",
         "total_dehumidification_elec_kwh",
         "total_ventilation_elec_kwh",
+        "total_recirculation_elec_kwh",
         "total_electricity_kwh",
         "co2_ambient_ppm",
         "max_co2_available_ppm",
@@ -90,6 +91,7 @@ def test_simulate_daily_series_rows_have_expected_fields():
         "fan_pad_active_hours",
         "dehumidification_elec_kw",
         "ventilation_elec_kw",
+        "recirculation_elec_kw",
     ):
         assert key in row
 
@@ -152,12 +154,24 @@ def test_simulate_rejects_malformed_start_date():
 # -- electricity consumption summary fields --
 
 
-def test_total_electricity_kwh_is_sum_of_its_two_components():
+def test_total_electricity_kwh_is_sum_of_its_components():
     body = client.post("/simulate", json={"duration_days": 5}).json()
     summary = body["summary"]
     assert summary["total_electricity_kwh"] == pytest.approx(
-        summary["total_dehumidification_elec_kwh"] + summary["total_ventilation_elec_kwh"]
+        summary["total_dehumidification_elec_kwh"]
+        + summary["total_ventilation_elec_kwh"]
+        + summary["total_recirculation_elec_kwh"]
     )
+
+
+def test_recirculation_electricity_is_bounded_by_its_fixed_fan_power():
+    body = client.post("/simulate", json={"duration_days": 5}).json()
+    summary = body["summary"]
+    # recirculation_fan_power_kw default (config/greenhouse_example.yaml) is 4.7 kW, fixed --
+    # the recirculation fans are either fully on or off, never modulated -- so total kWh can
+    # never exceed running the whole period at that constant power.
+    max_possible_kwh = 4.7 * 5 * 24
+    assert 0 < summary["total_recirculation_elec_kwh"] <= max_possible_kwh
 
 
 def test_stricter_dehumidification_setpoint_increases_its_electricity_use():

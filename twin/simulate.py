@@ -87,6 +87,12 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
         ventilation_elec_kw = (
             active_ach * params.geometry.volume_m3 * params.climate_control.ventilation_specific_fan_power_w_per_m3h / 1000.0
         )
+        # Recirculation (HAF) fans run opposite to active ventilation: on during baseline/
+        # passive airflow (mixing indoor air is useful, e.g. while heating), switched off once
+        # ventilation ramps above vent_min_ach (real HAF practice -- running them against an
+        # active exhaust airstream is wasted effort once that's already mixing the air).
+        recirculation_active = climate_result.vent_ach <= params.climate_control.vent_min_ach
+        recirculation_elec_kw = params.climate_control.recirculation_fan_power_kw if recirculation_active else 0.0
 
         records.append(
             {
@@ -101,6 +107,7 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
                 "fan_pad_active": climate_result.fan_pad_active,
                 "dehumidification_elec_kw": dehumidification_elec_kw,
                 "ventilation_elec_kw": ventilation_elec_kw,
+                "recirculation_elec_kw": recirculation_elec_kw,
                 "heat_loss_avoided_kw": climate_result.heat_loss_avoided_kw,
                 "vent_ach": climate_result.vent_ach,
                 "co2_injected_kg": climate_result.co2_injected_kg,
