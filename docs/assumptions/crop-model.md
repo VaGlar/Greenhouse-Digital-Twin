@@ -22,7 +22,7 @@
 | Constant | Value | Tag | Notes |
 |---|---|---|---|
 | `P_MAX_UMOL_M2_LEAF_S` | 20.0 | **SOURCED, conservative end** | Light-saturated leaf photosynthesis rate for tomato is reported in the ~20–40 µmol CO2 m⁻²·s⁻¹ range across studies (varies by cultivar, EC, measurement conditions); one study specifically found 19.5–22.5 µmol·m⁻²·s⁻¹ depending on nutrient EC. 20 sits at the low-to-middle end of the range — a conservative, defensible choice. Source: [Growth and Photosynthetic Response of Tomato to Nutrient Solution Concentration at Two Light Levels](https://www.researchgate.net/publication/258515123_Growth_and_Photosynthetic_Response_of_Tomato_to_Nutrient_Solution_Concentration_at_Two_Light_Levels) (journal article, specific page not confirmed — figure taken from search-result summary). |
-| `LIGHT_HALF_SAT_W_M2` | 200.0 | **PLACEHOLDER** | Not individually verified — a plausible order-of-magnitude light half-saturation constant, common in simplified canopy photosynthesis models, but not checked against a specific tomato citation. |
+| `LIGHT_HALF_SAT_W_M2` | 200.0 | **PLACEHOLDER** | Not individually verified — a plausible order-of-magnitude light half-saturation constant, common in simplified canopy photosynthesis models, but not checked against a specific tomato citation. Feeds `_canopy_light_response`'s Beer-Lambert-integrated canopy formula (see "Bug fix: canopy photosynthesis ignored self-shading" below), not a flat per-leaf multiplier as before 2026-08-25. |
 | `CO2_HALF_SAT_PPM` | 375.0 (was 200.0, raised 2026-08-20) | **SOURCED** | Shape of the rising part of the CO2 response curve below its cap. Raised from an unsourced 200 toward the biochemical Rubisco Km for CO2 (~270-300 ppm, Ci-based, FvCB-model literature at 25°C), adjusted for the Ci/Ca gradient (Ci/Ca ~0.7-0.8 for well-watered C3 plants) to get a Ca-based (ambient/greenhouse air) equivalent of ~340-430 ppm — used the midpoint, 375. On its own, this factor's elasticity is always <1 (rectangular hyperbola), so it structurally can't reproduce the ~56-74% season-long yield gain a study reports from 500→700 ppm CO2 — see `CO2_LAI_BOOST_MAX` below for the channel that closes that gap. Confirmed with a sensitivity sweep (K=100..600, user reviewed the full table): K=375 lands the model's ambient(420)→700ppm yield gain at ~56.4%, the low end of that reported range. Source: `papers/co2-half-saturation-tomato.md`. |
 | `CO2_LAI_BOOST_MAX`, `CO2_AMBIENT_REFERENCE_PPM` | 0.2688, 420.0 (added 2026-08-20) | **SOURCED** | Real CO2-enrichment yield gains come mostly from more/bigger leaves (LAI), which compounds over the season (more canopy → more assimilation every subsequent hour) — not just a faster instantaneous photosynthesis rate, which is all `CO2_HALF_SAT_PPM` alone captures. A study found LAI +26.88% at 700 ppm vs. ambient. `_lai()`'s `effective_lai_max` now scales by a CO2-driven factor: 1.0 at 420 ppm (`CO2_AMBIENT_REFERENCE_PPM`), rising to 1.2688 at 700 ppm (`CO2_SATURATION_PPM`), reusing `_co2_response`'s shape in between. Combined with the `CO2_HALF_SAT_PPM=375` correction above, this closes the gap the elasticity argument identified: the model's ambient→700ppm yield gain is now ~56.4%, matching the low end of the real 56-74% range. Source: `papers/co2-lai-growth-boost.md`. Baseline 150-day yield at the default 700ppm setpoint: 15.64 kg/m². |
 | `CO2_SATURATION_PPM` | 700.0 (added 2026-08-20) | **SOURCED, bug fix** | The raw Michaelis-Menten response (`co2/(co2+K)`) never caps — rises asymptotically forever, so yield kept increasing with CO2 setpoint with no limit (the user caught this directly: "however much I raise it, yield keeps rising — shouldn't 1200ppm be excessive?"). A study testing 500/700/850/1000 ppm on tomato found 700 ppm optimal, with no further yield benefit above it. Fixed by clamping the response function's input at 700 ppm — the curve plateaus there instead of climbing indefinitely. `climate_control.co2_setpoint_day_ppm` corrected from 900 to 700 to match (900 was spending CO2 dosing capacity for zero extra yield). Source: `papers/tomato-co2-optimum-700ppm.md`. |
@@ -56,9 +56,50 @@ While wiring VPD into photosynthesis, found that `_temperature_response()`'s "no
 
 **Combined effect of the VPD-photosynthesis link + this clamp fix**: baseline 150-day yield moved from 20.96 to **8.43 kg/m²** at the default 85% dehumidification setpoint — a large drop, but not a bug: most daytime hours now sit at VPD well below the 0.85 kPa optimum (median ~0.39 kPa) because 85% RH is a fairly humid ceiling. See the sensitivity table in `climate-control.md`'s `dehumidification_setpoint_pct` row — this is a genuine, adjustable design trade-off now visible for the first time, not something to silently "fix" back to the old yield number.
 
+## Bug fix: canopy photosynthesis ignored self-shading (2026-08-25)
+
+Found while sanity-checking a 300-day real-weather run against real-world Dutch greenhouse
+tomato yield benchmarks (75 kg/m² without artificial light, 90+ with, 116 "standard" high-tech,
+121 record — [hortidaily.com](https://www.hortidaily.com/article/9379440/new-record-yield-for-dutch-greenhouse-121-kg-per-m2/),
+[upuper.com](https://upuper.com/industry_information/The-output-per-square-meter-reaches-70-kg-Decipher-the-reason-for-the-high-yield-of-tomatoes-in-Dutch-smart-greenhouses.html)):
+the model was producing yields at Dutch-record level (~113 kg/m²/year annualized) for a
+greenhouse with **no** supplemental lighting — implausible.
+
+Root cause: canopy gross assimilation was computed as `p_gross_umol_m2_leaf_s * lai` — a single
+leaf's response to the *full, unattenuated* incident light, multiplied flatly by total LAI. This
+implicitly assumes every layer of the canopy sees the same full sun, when in reality lower leaves
+are self-shaded by the ones above (the same canopy the transpiration calculation right below it
+already applies Beer-Lambert attenuation to, via `canopy_interception` — just not, until now, for
+photosynthesis). Because the Michaelis-Menten light-response curve is concave, this flat
+multiplication overestimates canopy assimilation at every light level, but disproportionately more
+at **low** light than high light (self-shading barely matters when the whole canopy is already
+light-limited at low incident light, so there's little "extra" being missed relative to a properly
+shaded calculation — whereas at high light, upper leaves are already near-saturated and shading
+the lower ones does matter more, closing part of the gap). Net effect: the model's yield was far
+too *insensitive* to seasonal light variation — a real run showed November (mean solar 89 W/m²)
+producing 0.324 kg/m²/day versus May (mean solar 262 W/m², ~3x more light) producing only 0.443
+kg/m²/day, just 37% more despite 3x the light.
+
+Fixed with `_canopy_light_response`: the standard analytical result for integrating a
+Michaelis-Menten leaf response over a Beer-Lambert-attenuated light profile through canopy depth
+(de Wit 1965 / Goudriaan-style integrated canopy photosynthesis) —
+`(1/k) * ln[(I0+K) / (I0*exp(-k*LAI)+K)]`, reusing the same `CANOPY_LIGHT_EXTINCTION_COEFF` (k)
+already sourced for transpiration. This properly accounts for LAI on its own (no separate `* lai`
+multiplication needed) and restores realistic diminishing returns from both light and leaf area.
+
+**Impact** (300-day run, 2026-09-15 start, real Αλεξάνδρεια Ημαθίας weather, fan-pad cooling
+enabled): yield **92.98 → 42.58 kg/m²** (a 54% drop). Seasonal light-sensitivity is now much more
+realistic: November 0.130 kg/m²/day vs. May 0.229 kg/m²/day (~1.8x, tracking the ~3x light ratio
+far more closely than the old 1.37x). Annualized, ~51.8 kg/m²/year now sits *below* the
+without-artificial-lighting Dutch benchmark (~75 kg/m²/year) — plausible for a Greek greenhouse
+without supplemental lighting, rather than implausibly matching the all-time Dutch record. Default
+150-day config yield: 13.38 kg/m² (was 32.70 with fan-pad enabled, pre-fix). 4 new regression
+tests (`tests/test_crop_model.py`) cover the diminishing-returns-with-LAI property directly and
+the restored light sensitivity at the `TomatoCropModel.step` level.
+
 ## Bottom line
 
-The **structure** of the crop model (light/CO2/temperature/VPD response curves feeding canopy photosynthesis, minus maintenance respiration, partitioned to fruit by growth stage, with CO2 also boosting LAI growth) is a legitimate simplified version of how real crop models like TOMGRO work. Most of the **numbers** are literature-plausible but not individually calibrated to this greenhouse. Baseline 150-day yield at the default config has moved several times as these corrections landed: 13.30 (start) → 20.25 (`fruit_partition_fraction_max`/`T_OPT_C` raised, 2026-08-19) → 20.96 (thermal screen + respiration bug fix, 2026-08-20) → 15.49 (RH setpoint corrected to the literature value, 2026-08-20) → 15.64 (CO2 response capped + half-saturation corrected + CO2→LAI growth channel added, 2026-08-20). Each step is documented above with its own rationale — treat the current number as "internally more consistent than before," not as a validated absolute prediction; that still requires this greenhouse's own sensor/yield data.
+The **structure** of the crop model (light/CO2/temperature/VPD response curves feeding canopy photosynthesis, minus maintenance respiration, partitioned to fruit by growth stage, with CO2 also boosting LAI growth) is a legitimate simplified version of how real crop models like TOMGRO work. Most of the **numbers** are literature-plausible but not individually calibrated to this greenhouse. Baseline 150-day yield at the default config has moved several times as these corrections landed: 13.30 (start) → 20.25 (`fruit_partition_fraction_max`/`T_OPT_C` raised, 2026-08-19) → 20.96 (thermal screen + respiration bug fix, 2026-08-20) → 15.49 (RH setpoint corrected to the literature value, 2026-08-20) → 15.64 (CO2 response capped + half-saturation corrected + CO2→LAI growth channel added, 2026-08-20) → 32.70 (real weather + ventilation-overshoot fix + fan-pad cooling enabled, 2026-08-25) → **13.38** (canopy self-shading fix, 2026-08-25 — see below). Each step is documented above with its own rationale — treat the current number as "internally more consistent than before," not as a validated absolute prediction; that still requires this greenhouse's own sensor/yield data.
 
 ## Bug fix: nighttime respiration was a no-op (2026-08-20)
 
