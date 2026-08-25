@@ -6,6 +6,16 @@
 |---|---|---|---|
 | `heating_setpoint_day_c` | 20.0 | **SOURCED** | Within the commonly cited optimal daytime range for greenhouse tomato, ~21–27°C is often quoted as ideal but 20°C is a standard, slightly conservative operational setpoint used in practice (heating cost vs. growth trade-off). Source: general greenhouse tomato temperature guidance, e.g. [Review of optimum temperature/VPD for greenhouse tomato](https://www.researchgate.net/publication/323225604_Review_of_optimum_temperature_humidity_and_vapour_pressure_deficit_for_microclimate_evaluation_and_control_in_greenhouse_cultivation_of_tomato_a_review) (review article, no single page — synthesizes many studies). |
 | `heating_setpoint_night_c` | 17.0 | **SOURCED** | Matches commonly cited optimal nighttime range of 17–18°C for greenhouse tomato. Same source as above. |
+
+**Cross-check, 2026-08-25: does the heating setpoint's coupling to ventilation/dehumidification actually show up in practice?** `vent_setpoint = heating_setpoint(hour) + vent_temp_margin_c` (`climate_model.py:191`), so a *lower* heating setpoint lowers the point at which ventilation ramps up, and more ventilation pulls in more outdoor humidity — which then feeds directly into the active dehumidification system's workload (`vapor_after_vent` → dehumidification demand, `climate_model.py:314-353`). A 60-day sensitivity run confirms this is not just structurally present but numerically significant: a low setpoint (18°C day / 15°C night) vs. a high one (26°C day / 20°C night), same weather —
+
+| | Low setpoint (18/15°C) | High setpoint (26/20°C) |
+|---|---|---|
+| Hours of active ventilation/fan-pad | 797 / 1440 (55%) | 628 / 1440 (44%) |
+| Total water removed by dehumidification | 168,938 kg | 71,573 kg |
+| Mean indoor RH | 68.9% | 61.8% |
+
+The lower setpoint makes the dehumidification system work **2.36x harder** and still lands at a *higher* mean RH (closer to its capacity ceiling), not lower — confirming the setpoint choice is a real, coupled climate trade-off in this model, not an isolated dial.
 | `day_start_hour` / `day_end_hour` | 6 / 20 | **PLACEHOLDER** | A generic 14-hour "day" window, not tied to actual sunrise/sunset for the greenhouse's real latitude/season — the weather model already computes solar radiation seasonally, but this day/night climate-control window is currently a flat clock-time boundary, not linked to actual daylight. Gates the heating setpoint switch and CO2 dosing target, and is one of the thermal screen's night trigger (see `screen_energy_saving_fraction` below). **Not user-adjustable.** Worth revisiting: could be derived from latitude + day-of-year instead of hardcoded hours. |
 | `vent_temp_margin_c` | 2.0 | **PLACEHOLDER** | A standard control-engineering choice (ventilation kicks in a couple degrees above the heating setpoint to avoid heating/venting oscillating against each other) — reasonable practice, not from a specific greenhouse-tomato source. |
 | `vent_max_ach` | 15.0 | **PLACEHOLDER** | Air changes per hour under full ventilation — order-of-magnitude plausible for a naturally/mechanically vented greenhouse, not benchmarked against this greenhouse's actual vent design (roof vent area, fan capacity). |
