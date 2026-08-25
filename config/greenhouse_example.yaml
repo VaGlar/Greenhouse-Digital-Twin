@@ -44,8 +44,8 @@ climate_control:
                                      # (night / too-hot / cold-with-net-benefit), not user-configurable.
   dehumidification_setpoint_pct: 70.0   # SOURCED: pollination optimum for greenhouse tomato RH
                                          # (papers/greenhouse-tomato-optimal-rh.md); active dehum. modeled as unconstrained
-  fan_pad_cooling_enabled: false   # Initial config choice: does this greenhouse have fan-and-pad
-                                     # evaporative cooling? Off by default -- see docs/assumptions/climate-control.md
+  fan_pad_cooling_enabled: true    # Initial config choice: does this greenhouse have fan-and-pad
+                                     # evaporative cooling? Enabled for this greenhouse -- see docs/assumptions/climate-control.md
   fan_pad_efficiency: 0.80         # SOURCED: UF/IFAS Extension CIR1135/AE069, up to 85% for a well-maintained
                                      # system; only used when fan_pad_cooling_enabled is true
 
