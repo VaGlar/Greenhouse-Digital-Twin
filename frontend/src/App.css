@@ -141,7 +141,7 @@ body {
 
 /* ── Left sidebar: domain tabs + compact params ── */
 .sidebar {
-  flex: 0 0 300px;
+  flex: 0 0 380px;
   display: flex;
   flex-direction: column;
   background: var(--surface-1);
@@ -507,6 +507,10 @@ body {
 
 .secondary-button:hover {
   background: var(--surface-2);
+}
+
+.jump-to-charts {
+  width: fit-content;
 }
 
 .error {

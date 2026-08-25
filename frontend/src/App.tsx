@@ -191,10 +191,85 @@ function App() {
   }
 
   const latestDay = result?.daily_series.at(-1) ?? null;
-  const showSchematic = activeTab !== "charts";
+  const showSchematic = activeTab === "chp";
+  const meanIndoorTempC = result
+    ? result.daily_series.reduce((sum, d) => sum + d.temp_in_c, 0) / result.daily_series.length
+    : null;
   const isCompare = Boolean(result && baselineResult);
   const chartData = result ? (baselineResult ? mergeForCompare(result.daily_series, baselineResult.daily_series) : result.daily_series) : [];
   const xKey = isCompare ? "day" : "date";
+
+  // Shared chart definitions -- reused across the crop/weather tabs (a relevant subset,
+  // so parameter changes are visible without switching tabs) and the charts tab (full set).
+  const tempChart = (
+    <ComparableChart
+      title="Θερμοκρασία"
+      unit="°C"
+      height={260}
+      data={chartData}
+      xKey={xKey}
+      series={buildSeries(
+        [
+          { key: "temp_in_c", name: "Εσωτερική", color: "var(--series-1)" },
+          { key: "temp_out_c", name: "Εξωτερική", color: "var(--series-2)" },
+        ],
+        isCompare,
+      )}
+    />
+  );
+  const heatChart = result && (
+    <ComparableChart
+      title="Θερμική κατανάλωση (μέση ισχύς/ώρα)"
+      subtitle={`Μέγιστη ισχύς CHP: ${result.summary.max_heat_available_kw.toLocaleString()} kW — η κατανάλωση δεν μπορεί ποτέ να την ξεπεράσει.`}
+      unit=" kW"
+      height={260}
+      data={chartData}
+      xKey={xKey}
+      series={buildSeries([{ key: "heat_used_kw", name: "Μέση ισχύς", color: "var(--energy)" }], isCompare)}
+    />
+  );
+  const screenChart = (
+    <ComparableChart
+      title="Ώρες κλειστής θερμοκουρτίνας/ημέρα"
+      unit="h"
+      height={260}
+      domain={[0, 24]}
+      data={chartData}
+      xKey={xKey}
+      series={buildSeries([{ key: "screen_closed_hours", name: "Κλειστή", color: "var(--humidity)" }], isCompare)}
+    />
+  );
+  const rhChart = (
+    <ComparableChart
+      title="Σχετική υγρασία εσωτερικού χώρου"
+      unit="%"
+      height={220}
+      domain={[0, 100]}
+      data={chartData}
+      xKey={xKey}
+      series={buildSeries([{ key: "rh_in_pct", name: "RH", color: "var(--humidity)" }], isCompare)}
+    />
+  );
+  const vpdChart = (
+    <ComparableChart
+      title="VPD (έλλειμμα πίεσης υδρατμών)"
+      unit=" kPa"
+      height={220}
+      data={chartData}
+      xKey={xKey}
+      series={buildSeries([{ key: "vpd_kpa", name: "VPD", color: "var(--humidity)" }], isCompare)}
+    />
+  );
+  const yieldChart = (
+    <ComparableChart
+      title="Σωρευτική παραγωγή τομάτας"
+      unit=" kg/m²"
+      height={320}
+      data={chartData}
+      xKey={xKey}
+      series={buildSeries([{ key: "fruit_fresh_yield_kg_m2", name: "Yield", color: "var(--series-4)" }], isCompare)}
+    />
+  );
 
   return (
     <div className="dashboard">
@@ -394,7 +469,7 @@ function App() {
                 ))}
                 <p className="side-note">
                   ⓘ Θερμοκουρτίνα &amp; fan-pad: πλήρως αυτόματα (νύχτα/ζέστη/κρύο) — δες την
-                  ένδειξη στο σχηματικό.
+                  ένδειξή τους στο tab «Θερμοκήπιο».
                 </p>
                 <dl className="spec-list">
                   <div className="spec-row">
@@ -523,76 +598,76 @@ function App() {
             </section>
           )}
 
+          {activeTab === "recipe" && (
+            <p className="side-note">
+              Η συνταγή γεωπονίας δεν επηρεάζει ακόμα την προσομοίωση, οπότε δεν υπάρχουν
+              αποτελέσματα να δείξουμε εδώ.
+            </p>
+          )}
+
+          {activeTab === "crop" && (
+            <>
+              {result ? (
+                <>
+                  <section className="stat-row">
+                    <StatTile label="Τελικό yield" value={`${result.summary.final_yield_kg_m2.toFixed(2)} kg/m²`} />
+                    <StatTile
+                      label="Συνολική παραγωγή"
+                      value={`${result.summary.total_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
+                    />
+                  </section>
+                  <div className="chart-grid">{yieldChart}</div>
+                </>
+              ) : (
+                <p className="side-note">Τρέξε μια προσομοίωση για να δεις αποτελέσματα καλλιέργειας.</p>
+              )}
+              {result && (
+                <button className="secondary-button jump-to-charts" onClick={() => setActiveTab("charts")}>
+                  📈 Δες όλα τα διαγράμματα
+                </button>
+              )}
+            </>
+          )}
+
+          {activeTab === "weather" && (
+            <>
+              {result && meanIndoorTempC !== null ? (
+                <>
+                  <section className="stat-row">
+                    <StatTile label="Μέση εσωτερική θερμοκρασία" value={`${meanIndoorTempC.toFixed(1)}°C`} />
+                    <StatTile
+                      label="Θερμική κατανάλωση"
+                      value={`${result.summary.total_heat_used_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`}
+                    />
+                    <StatTile label="Κουρτίνα κλειστή" value={`${result.summary.screen_deployed_pct.toFixed(0)}%`} />
+                  </section>
+                  <div className="chart-grid">
+                    {tempChart}
+                    {heatChart}
+                    {screenChart}
+                    {rhChart}
+                    {vpdChart}
+                  </div>
+                </>
+              ) : (
+                <p className="side-note">Τρέξε μια προσομοίωση για να δεις τα αποτελέσματα κλίματος.</p>
+              )}
+              {result && (
+                <button className="secondary-button jump-to-charts" onClick={() => setActiveTab("charts")}>
+                  📈 Δες όλα τα διαγράμματα
+                </button>
+              )}
+            </>
+          )}
+
           {activeTab === "charts" && result && (
             <div className="chart-grid">
-              <ComparableChart
-                title="Θερμοκρασία"
-                unit="°C"
-                height={260}
-                data={chartData}
-                xKey={xKey}
-                series={buildSeries(
-                  [
-                    { key: "temp_in_c", name: "Εσωτερική", color: "var(--series-1)" },
-                    { key: "temp_out_c", name: "Εξωτερική", color: "var(--series-2)" },
-                  ],
-                  isCompare,
-                )}
-              />
-
-              <ComparableChart
-                title="Θερμική κατανάλωση (μέση ισχύς/ώρα)"
-                subtitle={`Μέγιστη ισχύς CHP: ${result.summary.max_heat_available_kw.toLocaleString()} kW — η κατανάλωση δεν μπορεί ποτέ να την ξεπεράσει.`}
-                unit=" kW"
-                height={260}
-                data={chartData}
-                xKey={xKey}
-                series={buildSeries([{ key: "heat_used_kw", name: "Μέση ισχύς", color: "var(--energy)" }], isCompare)}
-              />
-
-              <ComparableChart
-                title="Ώρες κλειστής θερμοκουρτίνας/ημέρα"
-                unit="h"
-                height={260}
-                domain={[0, 24]}
-                data={chartData}
-                xKey={xKey}
-                series={buildSeries(
-                  [{ key: "screen_closed_hours", name: "Κλειστή", color: "var(--humidity)" }],
-                  isCompare,
-                )}
-              />
-
-              <ComparableChart
-                title="Σχετική υγρασία εσωτερικού χώρου"
-                unit="%"
-                height={220}
-                domain={[0, 100]}
-                data={chartData}
-                xKey={xKey}
-                series={buildSeries([{ key: "rh_in_pct", name: "RH", color: "var(--humidity)" }], isCompare)}
-              />
-
-              <ComparableChart
-                title="VPD (έλλειμμα πίεσης υδρατμών)"
-                unit=" kPa"
-                height={220}
-                data={chartData}
-                xKey={xKey}
-                series={buildSeries([{ key: "vpd_kpa", name: "VPD", color: "var(--humidity)" }], isCompare)}
-              />
-
-              <ComparableChart
-                title="Σωρευτική παραγωγή τομάτας"
-                unit=" kg/m²"
-                height={220}
-                data={chartData}
-                xKey={xKey}
-                series={buildSeries(
-                  [{ key: "fruit_fresh_yield_kg_m2", name: "Yield", color: "var(--series-4)" }],
-                  isCompare,
-                )}
-              />
+              {tempChart}
+              {heatChart}
+              {screenChart}
+              {rhChart}
+              {vpdChart}
+              {yieldChart}
             </div>
           )}
 
