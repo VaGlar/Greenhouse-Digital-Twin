@@ -76,6 +76,13 @@ class CropState:
     standing_dry_matter_g_m2: float = 5.0  # total plant dry matter per m2 ground area
     fruit_dry_matter_g_m2: float = 0.0
     fruit_fresh_yield_kg_m2: float = 0.0
+    # Cumulative unpaid respiration loss (g/m2) -- see _fruit_partition_fraction's
+    # caller in TomatoCropModel.step for why this exists: without it, hours where
+    # respiration exceeds assimilation (typically at night, when there's no light
+    # for photosynthesis at all) were a "free" loss with no consequence, since LAI
+    # doesn't depend on standing biomass. Any future net-positive growth now repays
+    # this deficit first, before anything is partitioned to fruit.
+    respiration_deficit_g_m2: float = 0.0
 
 
 @dataclass
@@ -247,9 +254,30 @@ class TomatoCropModel:
         # temperature (and therefore the thermal screen) have zero effect on yield.
         new_standing_dm = max(0.0, state.standing_dry_matter_g_m2 + net_dry_matter_g_m2_hour)
 
+        # Bug fix 2026-08-25: a net-negative hour (respiration > assimilation --
+        # normally every night, since gross assimilation is zero with no light) used
+        # to just shrink standing biomass with no other consequence. Because LAI
+        # doesn't depend on standing biomass, that loss was actually a net *benefit*
+        # to future yield: less biomass left over means less future respiration to
+        # pay, with photosynthetic capacity completely unaffected -- so *warmer*
+        # nights (more wasteful respiration) were perversely raising yield, the
+        # opposite of the real, literature-documented effect (this greenhouse's own
+        # night setpoint is set to 17C specifically because warmer nights hurt
+        # tomato yield). Track unpaid respiration losses as a deficit that any
+        # future net-positive growth must repay in full before anything is
+        # partitioned to fruit -- the real-world equivalent of a plant needing to
+        # rebuild what it burned before it can afford to set new fruit.
+        new_deficit = state.respiration_deficit_g_m2
+        growth_after_deficit_g_m2 = 0.0
+        if net_dry_matter_g_m2_hour < 0:
+            new_deficit += -net_dry_matter_g_m2_hour
+        else:
+            repayment = min(net_dry_matter_g_m2_hour, new_deficit)
+            new_deficit -= repayment
+            growth_after_deficit_g_m2 = net_dry_matter_g_m2_hour - repayment
+
         fruit_fraction = _fruit_partition_fraction(self.params, state.days_after_planting)
-        new_growth_g_m2 = max(0.0, net_dry_matter_g_m2_hour)
-        fruit_dm_increment = new_growth_g_m2 * fruit_fraction
+        fruit_dm_increment = growth_after_deficit_g_m2 * fruit_fraction
 
         new_fruit_dm = state.fruit_dry_matter_g_m2 + fruit_dm_increment
         new_fruit_fresh_yield_kg_m2 = new_fruit_dm / self.params.dry_matter_content_fruit / 1000.0
@@ -260,6 +288,7 @@ class TomatoCropModel:
             standing_dry_matter_g_m2=new_standing_dm,
             fruit_dry_matter_g_m2=new_fruit_dm,
             fruit_fresh_yield_kg_m2=new_fruit_fresh_yield_kg_m2,
+            respiration_deficit_g_m2=new_deficit,
         )
 
         # Canopy transpiration: fraction of solar radiation intercepted by the canopy
