@@ -20,6 +20,35 @@
 | `heat_to_power_ratio` | 1.15 | **PLACEHOLDER, plausible but unverified against this unit** | General CHP literature: reciprocating-engine CHP is typically quoted with a heat:power ratio around 0.8–1.0; some engine-based units with full exhaust + jacket-water heat recovery reach ~1.1–1.2. 1.15 sits at the high end of what was found, not contradicted by it but not confirmed either. Source: [UGI — Combined Heat and Power](https://www.ugi.com/gas-for-business/natural-gas-innovation/combined-heating-power/) and general CHP technology overviews (web articles, no page numbers). **Replace with the actual CHP unit's datasheet value once the equipment is selected** — this ratio matters a lot (it sets how much heat the greenhouse gets "for free"). |
 | `co2_kg_per_kwh_elec` | 0.18 | **PLACEHOLDER, derived not sourced** | Not taken from a single reference — back-of-envelope: natural gas combustion emits ≈0.202 kg CO2 per kWh (LHV) of fuel burned (typical EU/UK grid-average gas emission factor); at ~35–40% electrical efficiency, that's ≈2.5 kWh fuel per kWh electrical output, i.e. ≈0.50 kg CO2 combusted per kWh_elec. 0.18 kg/kWh_elec implies roughly a third of total combustion CO2 is captured and dosed to the greenhouse (the rest presumably not recoverable via the flue-gas scrubbing system) — a plausible but unverified assumption. **Should come from the CHP/CO2-dosing system's actual spec once selected**, since flue-gas CO2 recovery fraction varies a lot by scrubber design. |
 
+## Cross-check, 2026-08-25: is the simulated heating demand plausible for this climate?
+
+The user asked whether this greenhouse's heating need should be lower than a Dutch
+greenhouse's, even though Dutch greenhouses typically have much better insulation
+(double glazing, double energy screens vs. this greenhouse's single-layer double-inflated
+PE film). Checked against literature:
+
+> Heating fluctuated between 200 and 600 kWh/m²/y across [northern/central] Europe. [...]
+> For Mediterranean plastic greenhouses [...] to maintain day and night temperatures of
+> 18/16°C, annual heat energy requirement of PE greenhouses is 95-256 kWh/m².
+
+Source: aggregated from EU greenhouse energy-use review literature (via web search).
+
+This greenhouse's own 330-day simulation (default config) uses 747,236 kWh total heat over
+5,000 m² = 149.4 kWh/m²/season, or **≈165 kWh/m²/year** annualized — comfortably inside the
+Mediterranean 95-256 kWh/m²/year range, well below the northern-Europe 200-600 kWh/m²/year
+floor. Confirms the user's intuition: the climate gap (far fewer heating-degree-days at this
+site than in the Netherlands) dominates over the insulation gap (this greenhouse's plainer PE
+cover vs. Dutch double-glazing/double-screening) — a Mediterranean greenhouse still ends up
+needing meaningfully less heating overall, despite the weaker envelope. The flip side, also
+consistent with the same source: Mediterranean greenhouses have a real *cooling* need
+(~94 kWh/m²/year for Greece specifically) that Dutch greenhouses largely don't — exactly the
+trade-off this greenhouse's CHP (heat) + OptiClima (cooling/dehumidification) combination is
+built to cover.
+
+A useful sanity-check that the model's overall heating magnitude isn't wildly off, though not
+a substitute for calibrating against this specific greenhouse's own real energy bills once
+they exist.
+
 ## Physical constants (not assumptions — exact values)
 
 `twin/climate_model.py` also defines two module-level constants that are not modeling choices, just physics:
