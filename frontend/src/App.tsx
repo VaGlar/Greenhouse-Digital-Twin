@@ -30,11 +30,11 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "charts", label: "📈 Διαγράμματα" },
 ];
 
-/** A tab click on a schematic zone (climate & humidity params both live under
- * "recipe" now) — see GreenhouseSchematic's ZoneKey. */
+/** A tab click on a schematic zone (climate & humidity setpoints live in
+ * "weather" — see GreenhouseSchematic's ZoneKey). */
 const ZONE_TO_TAB: Record<ZoneKey, TabKey> = {
-  climate: "recipe",
-  humidity: "recipe",
+  climate: "weather",
+  humidity: "weather",
   crop: "crop",
 };
 
@@ -70,7 +70,11 @@ const CROP_SLIDERS: SliderDef[] = [
   },
 ];
 
-const RECIPE_SLIDERS: SliderDef[] = [
+/** Placeholder — real agronomy-recipe params (λίπανση/EC-pH, πρόγραμμα άρδευσης,
+ * κλάδεμα/φορτίο ταξιανθιών, επικονίαση) δεν είναι ακόμα μοντελοποιημένα. */
+const RECIPE_SLIDERS: SliderDef[] = [];
+
+const WEATHER_SLIDERS: SliderDef[] = [
   {
     key: "heating_setpoint_day_c",
     label: "Θερμοκρασία ημέρας",
@@ -109,9 +113,6 @@ const RECIPE_SLIDERS: SliderDef[] = [
     optimal: [65, 75],
     note: "65-75% είναι το βέλτιστο για επικονίαση. Πιο ξηρός αέρας ευνοεί το VPD photosynthesis optimum, trade-off με επικονίαση.",
   },
-];
-
-const WEATHER_SLIDERS: SliderDef[] = [
   { key: "duration_days", label: "Διάρκεια προσομοίωσης", unit: " μέρες", min: 30, max: 330, step: 10 },
 ];
 
@@ -245,26 +246,12 @@ function App() {
             )}
 
             {activeTab === "recipe" && (
-              <>
-                {RECIPE_SLIDERS.map((s) => (
-                  <ParamSlider
-                    key={s.key}
-                    label={s.label}
-                    unit={s.unit}
-                    min={s.min}
-                    max={s.max}
-                    step={s.step}
-                    optimal={s.optimal}
-                    note={s.note}
-                    value={sliderValues[s.key]}
-                    onChange={(v) => setSlider(s.key, v)}
-                  />
-                ))}
-                <p className="side-note">
-                  ⓘ Θερμοκουρτίνα &amp; fan-pad: πλήρως αυτόματα (νύχτα/ζέστη/κρύο) — δες την
-                  ένδειξη στο σχηματικό.
-                </p>
-              </>
+              <p className="side-note">
+                Η συνταγή γεωπονίας (λίπανση/EC-pH, πρόγραμμα άρδευσης, κλάδεμα &amp; φορτίο
+                ταξιανθιών, επικονίαση) δεν είναι ακόμα μοντελοποιημένη — θα προστεθεί εδώ όταν
+                υλοποιηθεί. Οι στόχοι κλίματος (θερμοκρασία, CO₂, αφύγρανση) βρίσκονται πλέον στο
+                tab «Καιρός».
+              </p>
             )}
 
             {activeTab === "chp" && config && (
@@ -329,6 +316,10 @@ function App() {
                     onChange={(v) => setSlider(s.key, v)}
                   />
                 ))}
+                <p className="side-note">
+                  ⓘ Θερμοκουρτίνα &amp; fan-pad: πλήρως αυτόματα (νύχτα/ζέστη/κρύο) — δες την
+                  ένδειξη στο σχηματικό.
+                </p>
                 <dl className="spec-list">
                   <div className="spec-row">
                     <dt>Πηγή</dt>
