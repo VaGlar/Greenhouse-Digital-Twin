@@ -31,6 +31,7 @@ Distinct from the tables above — these are things the model doesn't attempt to
 - **Fixed day/night clock window** (`climate_control.day_start_hour/day_end_hour`) — a flat 6am-8pm boundary, not tied to actual sunrise/sunset for the real site/season. See `climate-control.md`.
 - **Disease risk still not modeled** — RH/VPD now feed photosynthesis (2026-08-20, see `crop-model.md`), which is a prerequisite for a future disease-risk module (Botrytis/powdery mildew both depend heavily on RH), but that module itself doesn't exist yet.
 - **Economic layer is physical-only so far** (`economics.md`) — dehumidification and ventilation electricity are computed in kWh, but no €/kWh tariff, cost, or revenue figures exist yet; recirculation fans and fertigation pumps (both real consumers per the vendor quote) aren't modeled at all.
+- **`crop.variety` is a researched label, not a model input yet** (`crop-model.md`) — a real, regionally-plausible beef tomato class (EYRE RZ F1) was chosen after checking agronomic fit, market demand, and a real Northern Greece precedent, but no crop-model parameter is keyed to it yet. Planned: make variety-dependent traits (target fruit weight, truss rate, fruit-set temperature tolerance) into tunable parameters sourced to this default, so swapping the variety later means changing values, not the model.
 
 ## Research method note
 

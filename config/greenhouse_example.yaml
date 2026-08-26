@@ -63,7 +63,11 @@ climate_control:
                                      # docs/assumptions/economics.md
 
 crop:
-  variety: "Beefsteak tomato"      # site-specific placeholder
+  variety: "Beef tomato (EYRE RZ F1-class, ~230-280g)"  # PLACEHOLDER: chosen after checking
+                                    # regional fit, market demand, and a real Northern Greece
+                                    # CHP+hydroponic precedent -- not a confirmed real seed
+                                    # order. See docs/assumptions/crop-model.md and
+                                    # docs/papers/tomato-variety-selection-northern-greece.md.
   planting_date: 2026-09-15        # site-specific placeholder
   density_plants_per_m2: 2.5       # SOURCED: standard commercial single-stem high-wire density 2.3-2.5 plants/m2
                                     # (VT Extension SPES-474; Peet & Welles, "Greenhouse Tomato Production")
