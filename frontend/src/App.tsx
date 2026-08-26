@@ -73,10 +73,6 @@ const CROP_SLIDERS: SliderDef[] = [
   },
 ];
 
-/** Placeholder — real agronomy-recipe params (λίπανση/EC-pH, πρόγραμμα άρδευσης,
- * κλάδεμα/φορτίο ταξιανθιών, επικονίαση) δεν είναι ακόμα μοντελοποιημένα. */
-const RECIPE_SLIDERS: SliderDef[] = [];
-
 const WEATHER_SLIDERS: SliderDef[] = [
   {
     key: "heating_setpoint_day_c",

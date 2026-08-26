@@ -74,6 +74,7 @@ export interface DailyPoint {
   recirculation_elec_kw: number;
   /** Daily-average fruit-set success rate (%) — the _fruit_set_temp_response factor. */
   fruit_set_pct: number;
+  [key: string]: unknown;
 }
 
 export interface SimulationResult {
