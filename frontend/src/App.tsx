@@ -381,6 +381,10 @@ function App() {
                       <dt>Καρποί/τσαμπί</dt>
                       <dd>{config.crop.fruits_per_truss.toFixed(0)}</dd>
                     </div>
+                    <div className="spec-row">
+                      <dt>Στελέχη/φυτό</dt>
+                      <dd>{config.crop.stems_per_plant.toFixed(0)}</dd>
+                    </div>
                   </dl>
                 )}
                 {config && (
@@ -679,7 +683,7 @@ function App() {
                     />
                     <StatTile label="Μέσο Fruit Set" value={`${result.summary.avg_fruit_set_pct.toFixed(0)}%`} />
                     <StatTile
-                      label="Ρυθμός ταξιανθιών"
+                      label="Ρυθμός ταξιανθιών/στέλεχος"
                       value={`${result.summary.avg_truss_rate_per_week.toFixed(2)}/εβδ`}
                     />
                   </section>

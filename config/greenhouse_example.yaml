@@ -82,6 +82,16 @@ crop:
                                     # see docs/papers/tomato-variety-selection-northern-greece.md
   fruits_per_truss: 5.0            # SOURCED: generic beef/TOV class benchmark (4-6/truss),
                                     # not an EYRE RZ F1 datasheet figure -- see same doc
+  stems_per_plant: 1                # SITE-SPECIFIC: 1 for EYRE RZ F1-class (single-stem);
+                                    # set to 2 if a two-stem variety (e.g. Belladona F1) is chosen
+  photosynthesis_t_min_c: 10.0      # SOURCED: moved from twin/crop_model.py constants, same
+  photosynthesis_t_opt_c: 27.0      # values as before -- now per-variety config, not code.
+  photosynthesis_t_max_c: 35.0      # See docs/assumptions/crop-model.md
+  fruit_set_t_min_c: 12.0           # SOURCED: same, for the much narrower fruit-set response --
+  fruit_set_t_opt_c: 18.0           # the trait that actually differs meaningfully between real
+  fruit_set_t_max_c: 24.0           # varieties (e.g. Merlice F1's heat-tolerant fruit set)
+  canopy_light_extinction_coeff: 0.75  # SOURCED: Beer-Lambert k, moved from crop_model.py
+  maintenance_respiration_fraction_per_day: 0.015  # PLACEHOLDER, moved from crop_model.py
 
 hydroponic:
   system_type: "NFT"   # flag only in v1 — not modeled in depth yet

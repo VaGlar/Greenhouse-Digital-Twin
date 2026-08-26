@@ -184,17 +184,19 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
     final_yield_kg_m2 = float(results["fruit_fresh_yield_kg_m2"].iloc[-1])
     avg_fruit_set_pct = float(results["fruit_set_fraction"].mean() * 100.0)
     # Trusses/week: not a directly-modeled quantity -- derived by converting the model's
-    # cumulative fruit yield (per plant) into truss-equivalents via the variety's target fruit
-    # weight and fruits-per-truss (twin/params.py CropParams), then averaged over the whole
-    # run. A real grower counts trusses directly; this model tracks continuous dry-matter
-    # partitioning instead, so this is a reporting conversion, not new crop-model physics.
-    final_trusses_per_plant = (
-        final_yield_kg_m2
-        * 1000.0
-        / params.crop.density_plants_per_m2
-        / (params.crop.target_fruit_weight_g * params.crop.fruits_per_truss)
+    # cumulative fruit yield into truss-equivalents via the variety's target fruit weight and
+    # fruits-per-truss (twin/params.py CropParams), then averaged over the whole run. Divides
+    # by *stem* density (density_plants_per_m2 * stems_per_plant), not plant density -- each
+    # stem carries its own trusses, so a two-stem plant's yield is shared across two stems'
+    # worth of truss production, matching how a real grower actually reports "trusses/week"
+    # (per stem, not per plant). A real grower counts trusses directly; this model tracks
+    # continuous dry-matter partitioning instead, so this is a reporting conversion, not new
+    # crop-model physics.
+    stem_density_per_m2 = params.crop.density_plants_per_m2 * params.crop.stems_per_plant
+    final_trusses_per_stem = (
+        final_yield_kg_m2 * 1000.0 / stem_density_per_m2 / (params.crop.target_fruit_weight_g * params.crop.fruits_per_truss)
     )
-    avg_truss_rate_per_week = final_trusses_per_plant / (params.simulation.duration_days / 7.0)
+    avg_truss_rate_per_week = final_trusses_per_stem / (params.simulation.duration_days / 7.0)
     # heat_used_kw is an hourly instantaneous rate; sum(kW readings) * timestep_hours gives the
     # season's total energy (kWh). It is already hard-capped at the CHP's fixed heat output
     # every hour (twin/climate_model.py: heat_used_w = min(required_w, heat_available_w)), so it
@@ -234,7 +236,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "total_recirculation_elec_kwh": total_recirculation_elec_kwh,
             "total_electricity_kwh": total_electricity_kwh,
             "avg_fruit_set_pct": avg_fruit_set_pct,
-            "final_trusses_per_plant": final_trusses_per_plant,
+            "final_trusses_per_stem": final_trusses_per_stem,
             "avg_truss_rate_per_week": avg_truss_rate_per_week,
             "co2_ambient_ppm": params.climate_control.co2_ambient_ppm,
             "max_co2_available_ppm": max_co2_available_ppm,

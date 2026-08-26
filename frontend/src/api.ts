@@ -31,6 +31,7 @@ export interface GreenhouseConfig {
     fruiting_ramp_days: number;
     target_fruit_weight_g: number;
     fruits_per_truss: number;
+    stems_per_plant: number;
     [key: string]: unknown;
   };
   simulation: { start_date: string; duration_days: number; timestep_hours: number };
@@ -92,7 +93,7 @@ export interface SimulationResult {
     total_recirculation_elec_kwh: number;
     total_electricity_kwh: number;
     avg_fruit_set_pct: number;
-    final_trusses_per_plant: number;
+    final_trusses_per_stem: number;
     avg_truss_rate_per_week: number;
     co2_ambient_ppm: number;
     max_co2_available_ppm: number;

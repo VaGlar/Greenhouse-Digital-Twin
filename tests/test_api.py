@@ -69,7 +69,7 @@ def test_simulate_response_has_expected_summary_fields():
         "total_recirculation_elec_kwh",
         "total_electricity_kwh",
         "avg_fruit_set_pct",
-        "final_trusses_per_plant",
+        "final_trusses_per_stem",
         "avg_truss_rate_per_week",
         "co2_ambient_ppm",
         "max_co2_available_ppm",
@@ -185,13 +185,15 @@ def test_truss_rate_is_consistent_with_final_yield_and_config_defaults():
     fruit_weight_g = config["crop"]["target_fruit_weight_g"]
     fruits_per_truss = config["crop"]["fruits_per_truss"]
     density = config["crop"]["density_plants_per_m2"]
+    stems_per_plant = config["crop"]["stems_per_plant"]
+    stem_density = density * stems_per_plant
 
-    expected_trusses_per_plant = (
-        summary["final_yield_kg_m2"] * 1000.0 / density / (fruit_weight_g * fruits_per_truss)
+    expected_trusses_per_stem = (
+        summary["final_yield_kg_m2"] * 1000.0 / stem_density / (fruit_weight_g * fruits_per_truss)
     )
-    assert summary["final_trusses_per_plant"] == pytest.approx(expected_trusses_per_plant)
+    assert summary["final_trusses_per_stem"] == pytest.approx(expected_trusses_per_stem)
     assert summary["avg_truss_rate_per_week"] == pytest.approx(
-        summary["final_trusses_per_plant"] / (30 / 7.0)
+        summary["final_trusses_per_stem"] / (30 / 7.0)
     )
 
 

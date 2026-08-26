@@ -248,6 +248,41 @@ class CropParams:
     # target_fruit_weight_g to derive truss-rate metrics from the model's cumulative fruit
     # yield. See docs/papers/tomato-variety-selection-northern-greece.md.
     fruits_per_truss: float = 5.0
+    # Growing system: 1 = single-stem (the default this project's density/reference-density
+    # figures were sourced against -- Peet & Welles, VT Extension SPES-474), 2 = two-stem
+    # (e.g. Belladona F1, checked during variety selection -- see
+    # docs/papers/tomato-variety-selection-northern-greece.md). Feeds twin/crop_model.py's
+    # canopy/LAI density scaling and this API's truss-rate derivation as an effective
+    # stems/m2 = density_plants_per_m2 * stems_per_plant, since canopy size and truss
+    # production scale with total stem count, not plant count. SITE-SPECIFIC: set to match
+    # whichever real variety is chosen; 1 for the current EYRE RZ F1-class default.
+    stems_per_plant: int = 1
+    # SOURCED: bell-shaped photosynthesis temperature response thresholds (T_MIN, T_OPT,
+    # T_MAX), moved here from twin/crop_model.py module constants (2026-08-26) so a
+    # different variety's temperature tolerance is a config value, not a code change. Same
+    # defaults as before -- no behavior change. See docs/assumptions/crop-model.md.
+    photosynthesis_t_min_c: float = 10.0
+    photosynthesis_t_opt_c: float = 27.0
+    photosynthesis_t_max_c: float = 35.0
+    # SOURCED: fruit-set temperature tolerance thresholds -- much narrower than the
+    # photosynthesis response above (pollen viability/fruit set is far more temperature-
+    # sensitive). Moved from twin/crop_model.py module constants (2026-08-26) for the same
+    # reason -- this is exactly the trait that differs meaningfully between real varieties
+    # (e.g. Merlice F1's "very good fruit set at high temperatures" vs. this default, checked
+    # during variety selection). Same defaults as before -- no behavior change.
+    fruit_set_t_min_c: float = 12.0
+    fruit_set_t_opt_c: float = 18.0
+    fruit_set_t_max_c: float = 24.0
+    # SOURCED: Beer-Lambert canopy light extinction coefficient, reported 0.7-0.9 for
+    # high-wire tomato canopies -- varies somewhat with a variety's leaf habit/canopy
+    # architecture. Moved from a twin/crop_model.py module constant (2026-08-26). Same
+    # default as before -- no behavior change.
+    canopy_light_extinction_coeff: float = 0.75
+    # PLACEHOLDER: maintenance respiration as a fraction of standing biomass per day --
+    # plant vigor (and therefore respiration load) varies somewhat by variety. Moved from a
+    # twin/crop_model.py module constant (2026-08-26). Same default as before -- no behavior
+    # change.
+    maintenance_respiration_fraction_per_day: float = 0.015
 
     def __post_init__(self) -> None:
         if self.density_plants_per_m2 <= 0:
@@ -262,6 +297,16 @@ class CropParams:
             raise ValueError("target_fruit_weight_g must be > 0")
         if self.fruits_per_truss <= 0:
             raise ValueError("fruits_per_truss must be > 0")
+        if self.stems_per_plant not in (1, 2):
+            raise ValueError("stems_per_plant must be 1 (single-stem) or 2 (two-stem)")
+        if not self.photosynthesis_t_min_c < self.photosynthesis_t_opt_c < self.photosynthesis_t_max_c:
+            raise ValueError("photosynthesis_t_min_c < photosynthesis_t_opt_c < photosynthesis_t_max_c required")
+        if not self.fruit_set_t_min_c < self.fruit_set_t_opt_c < self.fruit_set_t_max_c:
+            raise ValueError("fruit_set_t_min_c < fruit_set_t_opt_c < fruit_set_t_max_c required")
+        if self.canopy_light_extinction_coeff <= 0:
+            raise ValueError("canopy_light_extinction_coeff must be > 0")
+        if self.maintenance_respiration_fraction_per_day <= 0:
+            raise ValueError("maintenance_respiration_fraction_per_day must be > 0")
 
 
 @dataclass

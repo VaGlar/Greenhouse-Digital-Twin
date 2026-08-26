@@ -48,9 +48,14 @@ CO2_LAI_BOOST_MAX = 0.2688  # SOURCED: CO2 enrichment's real yield gain comes mo
 CO2_SATURATION_PPM = 700.0  # SOURCED: tomato study testing 500/700/850/1000 ppm found 700ppm optimal,
 # no further yield benefit above it -- response plateaus here instead of rising indefinitely.
 # See docs/assumptions/crop-model.md and docs/papers/tomato-co2-optimum-700ppm.md
-T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 27.0, 35.0  # SOURCED: T_OPT raised from 24C to 27C to match photosynthesis-
-# specific studies reporting optimum 25-35C (tomato retains 50% of photosynthetic rate even at 47C) — Frontiers
+# DEFAULT values only (2026-08-26: moved to CropParams.photosynthesis_t_min/opt/max_c as the
+# real, per-run source of truth, so a different variety's temperature tolerance is a config
+# value, not a code change) -- kept here as the free functions' fallback defaults below.
+# SOURCED: T_OPT raised from 24C to 27C to match photosynthesis-specific studies reporting
+# optimum 25-35C (tomato retains 50% of photosynthetic rate even at 47C) — Frontiers
 # 10.3389/fpls.2017.00365; researchgate 323225604 review. T_MIN left unchanged (not part of this pass).
+T_MIN_C, T_OPT_C, T_MAX_C = 10.0, 27.0, 35.0
+# DEFAULT only (2026-08-26: moved to CropParams.maintenance_respiration_fraction_per_day).
 MAINTENANCE_RESPIRATION_FRACTION_PER_DAY = 0.015  # PLACEHOLDER, plausible order of magnitude — not individually sourced
 
 # Fruit-set temperature sensitivity -- SOURCED, added 2026-08-25. Deliberately separate from
@@ -60,6 +65,9 @@ MAINTENANCE_RESPIRATION_FRACTION_PER_DAY = 0.015  # PLACEHOLDER, plausible order
 # more temperature-sensitive: below ~55F (12.8C) promotes blossom drop and poor pollen vigor;
 # ideal fruit set sits in a narrow 60-70F (15.6-21.1C) window; above ~75F (24C) interferes with
 # pollen tube growth and causes blossom drop. See docs/papers/tomato-fruit-set-temperature-sensitivity.md.
+# DEFAULT only (2026-08-26: moved to CropParams.fruit_set_t_min/opt/max_c -- exactly the trait
+# that differs meaningfully between real varieties, e.g. Merlice F1's noted "very good fruit
+# set at high temperatures" vs. this default; see docs/assumptions/crop-model.md).
 FRUIT_SET_T_MIN_C, FRUIT_SET_T_OPT_C, FRUIT_SET_T_MAX_C = 12.0, 18.0, 24.0
 # PLACEHOLDER: half-life (hours) of the temperature EMA that _fruit_set_temp_response is
 # evaluated against, instead of the instantaneous hourly temp_in_c. Without this, a cold
@@ -72,6 +80,8 @@ FRUIT_SET_T_MIN_C, FRUIT_SET_T_OPT_C, FRUIT_SET_T_MAX_C = 12.0, 18.0, 24.0
 FRUIT_SET_TEMP_EMA_HALF_LIFE_HOURS = 12.0
 
 # Canopy transpiration (drives the climate model's humidity balance).
+# DEFAULT only (2026-08-26: moved to CropParams.canopy_light_extinction_coeff -- canopy
+# architecture/leaf habit varies somewhat by variety).
 CANOPY_LIGHT_EXTINCTION_COEFF = 0.75  # SOURCED: Beer-Lambert k for high-wire tomato canopies, reported 0.7-0.9
 # (general canopy light-interception literature; see docs/assumptions/crop-model.md)
 TRANSPIRATION_ENERGY_FRACTION = 0.70  # SOURCED: latent heat flux is 66.4-71.7% of net radiation intercepted
@@ -124,29 +134,42 @@ class CropStepResult:
     fruit_set_fraction: float
 
 
-def _temperature_response(temp_c: float) -> float:
-    """Bell-shaped response, 0 outside [T_MIN, T_MAX], 1 at T_OPT.
+def _temperature_response(
+    temp_c: float, t_min: float = T_MIN_C, t_opt: float = T_OPT_C, t_max: float = T_MAX_C
+) -> float:
+    """Bell-shaped response, 0 outside [t_min, t_max], 1 at t_opt.
+
+    Thresholds default to the module constants but are normally passed explicitly from
+    CropParams.photosynthesis_t_min/opt/max_c (2026-08-26) so a different variety's
+    temperature tolerance is a config value, not a code change.
 
     Fixed 2026-08-20: the normalized product function (Yin et al. style) only
-    equals exactly 1 at T_OPT by construction -- when T_OPT isn't equidistant
-    from T_MIN/T_MAX (it isn't here: 27 vs. midpoint 22.5), the raw parabola's
+    equals exactly 1 at t_opt by construction -- when t_opt isn't equidistant
+    from t_min/t_max (it isn't here: 27 vs. midpoint 22.5), the raw parabola's
     true peak sits elsewhere and the ratio can exceed 1 there (was hitting
     ~1.15 around 20-25C, exactly this greenhouse's normal operating range,
     silently over-boosting photosynthesis this whole time). Clamped at 1.0.
     """
-    if temp_c <= T_MIN_C or temp_c >= T_MAX_C:
+    if temp_c <= t_min or temp_c >= t_max:
         return 0.0
     # Normalized product function (Yin et al. style), smooth and bounded in [0, 1].
-    num = (temp_c - T_MIN_C) * (T_MAX_C - temp_c)
-    den = (T_OPT_C - T_MIN_C) * (T_MAX_C - T_OPT_C)
+    num = (temp_c - t_min) * (t_max - temp_c)
+    den = (t_opt - t_min) * (t_max - t_opt)
     return min(1.0, max(0.0, (num / den)))
 
 
-def _fruit_set_temp_response(temp_c: float) -> float:
-    """Bell-shaped response, 0 outside [FRUIT_SET_T_MIN, FRUIT_SET_T_MAX], 1 at
-    FRUIT_SET_T_OPT -- same normalized-product-function shape as
-    _temperature_response, but far narrower: pollen viability and fruit set are much
-    more temperature-sensitive than photosynthesis itself (see module constants).
+def _fruit_set_temp_response(
+    temp_c: float,
+    t_min: float = FRUIT_SET_T_MIN_C,
+    t_opt: float = FRUIT_SET_T_OPT_C,
+    t_max: float = FRUIT_SET_T_MAX_C,
+) -> float:
+    """Bell-shaped response, 0 outside [t_min, t_max], 1 at t_opt -- same
+    normalized-product-function shape as _temperature_response, but normally passed a far
+    narrower window: pollen viability and fruit set are much more temperature-sensitive than
+    photosynthesis itself (see module constants). Thresholds default to the module constants
+    but are normally passed explicitly from CropParams.fruit_set_t_min/opt/max_c (2026-08-26)
+    -- exactly the trait that differs meaningfully between real varieties.
 
     Added 2026-08-25: closes a gap the user found by testing extreme night setpoints
     -- with only _temperature_response (which barely penalizes cold, since it's
@@ -155,14 +178,14 @@ def _fruit_set_temp_response(temp_c: float) -> float:
     Real tomato fruit set fails at both ends of a much narrower window than
     photosynthesis tolerates; this response multiplies the fruit partition fraction
     directly so an unrealistically cold (or hot) night now costs real yield."""
-    if temp_c <= FRUIT_SET_T_MIN_C or temp_c >= FRUIT_SET_T_MAX_C:
+    if temp_c <= t_min or temp_c >= t_max:
         return 0.0
-    num = (temp_c - FRUIT_SET_T_MIN_C) * (FRUIT_SET_T_MAX_C - temp_c)
-    den = (FRUIT_SET_T_OPT_C - FRUIT_SET_T_MIN_C) * (FRUIT_SET_T_MAX_C - FRUIT_SET_T_OPT_C)
+    num = (temp_c - t_min) * (t_max - temp_c)
+    den = (t_opt - t_min) * (t_max - t_opt)
     return min(1.0, max(0.0, num / den))
 
 
-def _canopy_light_response(solar_rad_w_m2: float, lai: float) -> float:
+def _canopy_light_response(solar_rad_w_m2: float, lai: float, k: float = CANOPY_LIGHT_EXTINCTION_COEFF) -> float:
     """Canopy-integrated light response, replacing a flat single-leaf-rate * LAI
     multiplication. Bug fix 2026-08-25: multiplying the top-of-canopy leaf response
     by LAI implicitly assumed every leaf layer sees the same full incident light,
@@ -184,7 +207,6 @@ def _canopy_light_response(solar_rad_w_m2: float, lai: float) -> float:
     extra explicit LAI multiplication."""
     if solar_rad_w_m2 <= 0 or lai <= 0:
         return 0.0
-    k = CANOPY_LIGHT_EXTINCTION_COEFF
     numerator = solar_rad_w_m2 + LIGHT_HALF_SAT_W_M2
     denominator = solar_rad_w_m2 * math.exp(-k * lai) + LIGHT_HALF_SAT_W_M2
     return (1.0 / k) * math.log(numerator / denominator)
@@ -232,7 +254,10 @@ def _lai(params: CropParams, days_after_planting: float, co2_ppm: float) -> floa
     CO2_AMBIENT_REFERENCE_PPM to +CO2_LAI_BOOST_MAX at CO2_SATURATION_PPM,
     reusing the same saturating shape as _co2_response for consistency.
     """
-    density_factor = min(1.0, params.density_plants_per_m2 / params.reference_density_plants_per_m2)
+    # Canopy size scales with total stem count, not plant count -- a two-stem plant carries
+    # roughly twice the leaf area of a single-stem one at the same plants/m2.
+    effective_stem_density = params.density_plants_per_m2 * params.stems_per_plant
+    density_factor = min(1.0, effective_stem_density / params.reference_density_plants_per_m2)
     co2_at_ambient = _co2_response(CO2_AMBIENT_REFERENCE_PPM)
     co2_at_saturation = _co2_response(CO2_SATURATION_PPM)
     co2_progress = (_co2_response(co2_ppm) - co2_at_ambient) / (co2_at_saturation - co2_at_ambient)
@@ -268,9 +293,14 @@ class TomatoCropModel:
     ) -> CropStepResult:
         lai = _lai(self.params, state.days_after_planting, co2_in_ppm)
 
-        f_light_canopy = _canopy_light_response(solar_rad_w_m2, lai)
+        f_light_canopy = _canopy_light_response(solar_rad_w_m2, lai, k=self.params.canopy_light_extinction_coeff)
         f_co2 = _co2_response(co2_in_ppm)
-        f_temp = _temperature_response(temp_in_c)
+        f_temp = _temperature_response(
+            temp_in_c,
+            self.params.photosynthesis_t_min_c,
+            self.params.photosynthesis_t_opt_c,
+            self.params.photosynthesis_t_max_c,
+        )
         f_vpd = _vpd_response(vpd_kpa)
 
         # Canopy-integrated already accounts for LAI (self-shading), unlike a flat
@@ -318,7 +348,7 @@ class TomatoCropModel:
         respiration_reference = max(state.respiration_reference_g_m2, state.standing_dry_matter_g_m2)
         respiration_g_m2_hour = (
             respiration_reference
-            * MAINTENANCE_RESPIRATION_FRACTION_PER_DAY
+            * self.params.maintenance_respiration_fraction_per_day
             / 24.0
             * max(f_temp, 0.3)
         )
@@ -345,7 +375,12 @@ class TomatoCropModel:
         # integrates recent conditions rather than an instant snapshot.
         ema_alpha = 1.0 - math.exp(-dt_hours * math.log(2) / FRUIT_SET_TEMP_EMA_HALF_LIFE_HOURS)
         new_temp_ema_c = state.recent_temp_ema_c + ema_alpha * (temp_in_c - state.recent_temp_ema_c)
-        f_fruit_set = _fruit_set_temp_response(new_temp_ema_c)
+        f_fruit_set = _fruit_set_temp_response(
+            new_temp_ema_c,
+            self.params.fruit_set_t_min_c,
+            self.params.fruit_set_t_opt_c,
+            self.params.fruit_set_t_max_c,
+        )
         new_growth_g_m2 = max(0.0, net_dry_matter_g_m2_hour)
         fruit_dm_increment = new_growth_g_m2 * fruit_fraction * f_fruit_set
 
@@ -365,7 +400,7 @@ class TomatoCropModel:
         # Canopy transpiration: fraction of solar radiation intercepted by the canopy
         # (Beer-Lambert, LAI-driven) that is converted to latent heat (water vapor),
         # feeding the climate model's humidity balance. Zero at night (no solar input).
-        canopy_interception = 1.0 - math.exp(-CANOPY_LIGHT_EXTINCTION_COEFF * lai)
+        canopy_interception = 1.0 - math.exp(-self.params.canopy_light_extinction_coeff * lai)
         absorbed_solar_w_m2 = solar_rad_w_m2 * canopy_interception
         latent_heat_w_m2 = absorbed_solar_w_m2 * TRANSPIRATION_ENERGY_FRACTION
         transpiration_kg_m2_hour = latent_heat_w_m2 * 3600.0 / LATENT_HEAT_OF_VAPORIZATION_J_KG
