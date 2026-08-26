@@ -96,6 +96,8 @@ export interface SimulationResult {
     avg_fruit_set_pct: number;
     final_trusses_per_stem: number;
     avg_truss_rate_per_week: number;
+    full_production_start_day: number;
+    steady_state_truss_rate_per_week: number | null;
     co2_ambient_ppm: number;
     max_co2_available_ppm: number;
   };

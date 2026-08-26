@@ -679,8 +679,16 @@ function App() {
                     />
                     <StatTile label="Μέσο Fruit Set" value={`${result.summary.avg_fruit_set_pct.toFixed(0)}%`} />
                     <StatTile
-                      label="Ρυθμός ταξιανθιών/στέλεχος"
+                      label="Ρυθμός ταξιανθιών/στέλεχος (όλη η περίοδος)"
                       value={`${result.summary.avg_truss_rate_per_week.toFixed(2)}/εβδ`}
+                    />
+                    <StatTile
+                      label="Ρυθμός ταξιανθιών/στέλεχος (σταθερή φάση)"
+                      value={
+                        result.summary.steady_state_truss_rate_per_week === null
+                          ? "—"
+                          : `${result.summary.steady_state_truss_rate_per_week.toFixed(2)}/εβδ`
+                      }
                     />
                   </section>
                   <div className="chart-grid">{fruitSetChart}</div>

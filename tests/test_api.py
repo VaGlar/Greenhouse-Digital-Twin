@@ -71,6 +71,8 @@ def test_simulate_response_has_expected_summary_fields():
         "avg_fruit_set_pct",
         "final_trusses_per_stem",
         "avg_truss_rate_per_week",
+        "full_production_start_day",
+        "steady_state_truss_rate_per_week",
         "co2_ambient_ppm",
         "max_co2_available_ppm",
     ):
@@ -195,6 +197,41 @@ def test_truss_rate_is_consistent_with_final_yield_and_config_defaults():
     assert summary["avg_truss_rate_per_week"] == pytest.approx(
         summary["final_trusses_per_stem"] / (30 / 7.0)
     )
+
+
+def test_steady_state_truss_rate_is_none_when_run_shorter_than_full_production_start():
+    # default config: fruiting_start_days=35 + fruiting_ramp_days=20 = day 55
+    body = client.post("/simulate", json={"duration_days": 30}).json()
+    summary = body["summary"]
+    assert summary["full_production_start_day"] == 55
+    assert summary["steady_state_truss_rate_per_week"] is None
+
+
+def test_steady_state_truss_rate_excludes_the_diluting_startup_phase():
+    body = client.post("/simulate", json={"duration_days": 150}).json()
+    summary = body["summary"]
+    config = client.get("/config").json()
+    fruit_weight_g = config["crop"]["target_fruit_weight_g"]
+    fruits_per_truss = config["crop"]["fruits_per_truss"]
+    stem_density = config["crop"]["density_plants_per_m2"] * config["crop"]["stems_per_plant"]
+    full_production_start_day = summary["full_production_start_day"]
+
+    yield_at_boundary = body["daily_series"][full_production_start_day - 1]["fruit_fresh_yield_kg_m2"]
+    steady_state_days = summary["duration_days"] - full_production_start_day
+    expected_trusses_per_stem = (
+        (summary["final_yield_kg_m2"] - yield_at_boundary)
+        * 1000.0
+        / stem_density
+        / (fruit_weight_g * fruits_per_truss)
+    )
+    expected_rate = expected_trusses_per_stem / (steady_state_days / 7.0)
+    # yield_at_boundary comes from daily_series, which rounds to 3 decimals for display --
+    # a looser tolerance than the default absorbs that rounding, not a real mismatch.
+    assert summary["steady_state_truss_rate_per_week"] == pytest.approx(expected_rate, rel=1e-4)
+
+    # the startup/ramp phase runs at near-zero production, so excluding it should raise the rate
+    # relative to the whole-season average (which is diluted by that near-zero window)
+    assert summary["steady_state_truss_rate_per_week"] > summary["avg_truss_rate_per_week"]
 
 
 def test_avg_fruit_set_pct_is_within_0_and_100():
