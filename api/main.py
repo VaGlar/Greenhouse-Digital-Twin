@@ -197,6 +197,24 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
         final_yield_kg_m2 * 1000.0 / stem_density_per_m2 / (params.crop.target_fruit_weight_g * params.crop.fruits_per_truss)
     )
     avg_truss_rate_per_week = final_trusses_per_stem / (params.simulation.duration_days / 7.0)
+    # The whole-season average above is diluted by the ~55-day vegetative/ramp-up window
+    # (near-zero production before fruiting even starts) and by any partial final week -- neither
+    # is what a grower means by "trusses/week" (that's the steady, full-production-phase pace).
+    # Recompute the same conversion using only the yield accumulated after the ramp finishes.
+    full_production_start_day = int(params.crop.fruiting_start_days + params.crop.fruiting_ramp_days)
+    steady_state_truss_rate_per_week = None
+    if params.simulation.duration_days > full_production_start_day:
+        yield_at_full_production_start_kg_m2 = float(
+            daily["fruit_fresh_yield_kg_m2"].iloc[full_production_start_day - 1]
+        )
+        steady_state_days = params.simulation.duration_days - full_production_start_day
+        steady_state_trusses_per_stem = (
+            (final_yield_kg_m2 - yield_at_full_production_start_kg_m2)
+            * 1000.0
+            / stem_density_per_m2
+            / (params.crop.target_fruit_weight_g * params.crop.fruits_per_truss)
+        )
+        steady_state_truss_rate_per_week = steady_state_trusses_per_stem / (steady_state_days / 7.0)
     # heat_used_kw is an hourly instantaneous rate; sum(kW readings) * timestep_hours gives the
     # season's total energy (kWh). It is already hard-capped at the CHP's fixed heat output
     # every hour (twin/climate_model.py: heat_used_w = min(required_w, heat_available_w)), so it
@@ -238,6 +256,8 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "avg_fruit_set_pct": avg_fruit_set_pct,
             "final_trusses_per_stem": final_trusses_per_stem,
             "avg_truss_rate_per_week": avg_truss_rate_per_week,
+            "full_production_start_day": full_production_start_day,
+            "steady_state_truss_rate_per_week": steady_state_truss_rate_per_week,
             "co2_ambient_ppm": params.climate_control.co2_ambient_ppm,
             "max_co2_available_ppm": max_co2_available_ppm,
         },

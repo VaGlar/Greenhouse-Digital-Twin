@@ -38,5 +38,6 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`tomato-crop-cycle-duration.md`](./tomato-crop-cycle-duration.md) | `simulation.duration_days` |
 | [`greenhouse-electricity-consumption.md`](./greenhouse-electricity-consumption.md) | `climate_control.dehumidification_specific_power_kwh_per_kg`, `climate_control.ventilation_specific_fan_power_w_per_m3h` |
 | [`tomato-variety-selection-northern-greece.md`](./tomato-variety-selection-northern-greece.md) | `crop.variety` |
+| [`tomato-truss-rate-benchmark.md`](./tomato-truss-rate-benchmark.md) | `summary.avg_truss_rate_per_week`, `summary.steady_state_truss_rate_per_week` — corrects a miscited comparison benchmark |
 
 See [`docs/sources.xlsx`](../sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

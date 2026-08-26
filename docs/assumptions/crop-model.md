@@ -210,18 +210,65 @@ model's existing `_fruit_set_temp_response` factor as a real `fruit_set_pct` out
 computed internally to gate fruit partitioning, never exposed). Neither is new crop-model
 physics -- both are reporting/derivation layers over already-computed state (`api/main.py`).
 
-Running the 330-day default config: `avg_truss_rate_per_week` comes out to **~0.27/week**, well
-below the ~1/week (stable 24h temperature) real commercial benchmark cited in
-`docs/papers/tomato-variety-selection-northern-greece.md`. This is not a new bug -- it's the
-same already-documented yield gap (this model's 39.95 kg/m²/330-day vs. the real commercial
-65-70 kg/m²/year TOV/beef benchmark, see "Bottom line" above) showing up in a different unit.
-Since `avg_truss_rate_per_week` is derived directly from `final_yield_kg_m2` divided by
-`target_fruit_weight_g x fruits_per_truss`, any shortfall in the model's underlying yield
-shows up proportionally here too -- it isn't an independent problem with the new fields
-themselves. `fruit_set_pct` looks physically sensible on its own: ~90-100% through the
-autumn/winter/spring months, dropping to ~50-65% during peak summer heat (temperatures pushing
-past `FRUIT_SET_T_MAX_C`), matching the real-world pattern of summer heat stress hurting fruit
-set.
+Running the 330-day default config: `avg_truss_rate_per_week` comes out to **~0.27/week**.
+`fruit_set_pct` looks physically sensible on its own: ~90-100% through the autumn/winter/spring
+months, dropping to ~50-65% during peak summer heat (temperatures pushing past
+`FRUIT_SET_T_MAX_C`), matching the real-world pattern of summer heat stress hurting fruit set.
+
+**Correction, 2026-08-26 (same day): the original "~1/week" comparison benchmark was
+miscited and the wrong number.** This section originally claimed 0.27/week was "well below the
+~1/week (stable 24h temperature) real commercial benchmark cited in
+`docs/papers/tomato-variety-selection-northern-greece.md`" -- checked that file directly and
+**no such figure appears in it**; that citation was wrong. A web search for the actual claim
+("a new truss forms almost every seven days... this cycle repeating for roughly 40 weeks each
+year") did turn up a real ~1/week *truss-formation* benchmark in commercial high-wire growing
+guides -- but it's a generic, roughly fruit-size-independent stem-growth/lowering cadence, not a
+number keyed to large beef-type fruit. Plugging it directly into *this* model's own
+`target_fruit_weight_g` (255g) and `fruits_per_truss` (5) assumptions gives an internally
+absurd result: 1 truss/week x 5 fruit x 255g x 2.5 stems/m² over a ~40-week season is
+~127.5 kg/m²/year, above even the Dutch all-time greenhouse tomato record (121 kg/m²/year, see
+"Bottom line" below). Working backward from this project's own already-cited real annual yield
+benchmark instead (65-70 kg/m²/year TOV/beef, see "Bottom line" below) with the same
+`target_fruit_weight_g`/`fruits_per_truss` assumptions gives a self-consistent large-beef-fruit
+truss rate of **~0.4-0.5/week**, not ~1/week -- large fruit needs proportionally more assimilate
+per truss than a smaller-fruited variety, so a slower truss rate at the same yield is expected,
+not a bug.
+
+**Also found: the whole-season average understates the model's actual production-phase pace.**
+`avg_truss_rate_per_week` divides total trusses by the *entire* `duration_days`, including the
+~55-day vegetative/ramp-up window (`fruiting_start_days` + `fruiting_ramp_days`) where production
+is near zero -- diluting the average well below what the plant achieves once fully cropping.
+Sampling the model's own daily yield curve by phase (330-day default run) shows this directly:
+
+| Phase | Truss rate/stem/week |
+|---|---|
+| Startup (day 1-55, before full fruiting) | ~0.06/week |
+| Early-mid full production (day 56-150) | ~0.26/week |
+| Summer peak heat (day 250-300) | ~0.29/week |
+| Late season (day 300-330) | ~0.14/week |
+| Best single week (day 212) | ~0.48/week |
+
+Added a second summary field, **`steady_state_truss_rate_per_week`** (`api/main.py`), computed
+the same way as `avg_truss_rate_per_week` but only over the days *after*
+`full_production_start_day` (`fruiting_start_days + fruiting_ramp_days`) -- i.e. excluding the
+diluting startup window. On the 330-day default config this comes out to **~0.31/week**
+(`full_production_start_day` = 55), noticeably higher than the whole-season **0.27/week** and
+close to the model's own peak-week figure (0.48/week) once the startup dilution is removed. Both
+fields are kept (whole-season total production capacity vs. steady-state pace are different
+questions a grower would ask), surfaced as two separate stat tiles in the frontend crop tab.
+`steady_state_truss_rate_per_week` is `null` when `duration_days` doesn't reach
+`full_production_start_day` yet (nothing to average over that phase).
+
+**Net conclusion**: the previous "well below ~1/week" framing combined a wrong citation with an
+apples-to-oranges benchmark. Against the corrected, self-consistent ~0.4-0.5/week benchmark, the
+model's own steady-state rate (~0.31/week average, up to ~0.48/week at peak) is closer than it
+looked -- a real, smaller gap remains, consistent with (not a new problem on top of) the
+already-documented overall yield gap (this model's 39.95 kg/m²/330-day vs. the real commercial
+65-70 kg/m²/year TOV/beef benchmark, see "Bottom line" below).
+
+See also: the "Πλήρες phase-aware μοντέλο" idea discussed with the user 2026-08-26 -- giving
+different climate-control setpoints per crop phase (not just different *reporting* windows, as
+here) is a larger follow-up, not yet started.
 
 ## Bug fix: nighttime respiration was a no-op (2026-08-20)
 
