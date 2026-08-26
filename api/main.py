@@ -170,6 +170,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "dehumidification_elec_kw": "mean",
                 "ventilation_elec_kw": "mean",
                 "recirculation_elec_kw": "mean",
+                "fruit_set_fraction": "mean",
             }
         )
         .reset_index()
@@ -178,8 +179,22 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
     daily["screen_closed_hours"] = daily["screen_closed_hours"] * params.simulation.timestep_hours
     daily["fan_pad_active_hours"] = daily["fan_pad_active_hours"] * params.simulation.timestep_hours
     daily["co2_in_ppm"] = daily["timestamp"].dt.date.map(daytime_co2_by_day)
+    daily["fruit_set_pct"] = daily["fruit_set_fraction"] * 100.0
 
     final_yield_kg_m2 = float(results["fruit_fresh_yield_kg_m2"].iloc[-1])
+    avg_fruit_set_pct = float(results["fruit_set_fraction"].mean() * 100.0)
+    # Trusses/week: not a directly-modeled quantity -- derived by converting the model's
+    # cumulative fruit yield (per plant) into truss-equivalents via the variety's target fruit
+    # weight and fruits-per-truss (twin/params.py CropParams), then averaged over the whole
+    # run. A real grower counts trusses directly; this model tracks continuous dry-matter
+    # partitioning instead, so this is a reporting conversion, not new crop-model physics.
+    final_trusses_per_plant = (
+        final_yield_kg_m2
+        * 1000.0
+        / params.crop.density_plants_per_m2
+        / (params.crop.target_fruit_weight_g * params.crop.fruits_per_truss)
+    )
+    avg_truss_rate_per_week = final_trusses_per_plant / (params.simulation.duration_days / 7.0)
     # heat_used_kw is an hourly instantaneous rate; sum(kW readings) * timestep_hours gives the
     # season's total energy (kWh). It is already hard-capped at the CHP's fixed heat output
     # every hour (twin/climate_model.py: heat_used_w = min(required_w, heat_available_w)), so it
@@ -218,6 +233,9 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "total_ventilation_elec_kwh": total_ventilation_elec_kwh,
             "total_recirculation_elec_kwh": total_recirculation_elec_kwh,
             "total_electricity_kwh": total_electricity_kwh,
+            "avg_fruit_set_pct": avg_fruit_set_pct,
+            "final_trusses_per_plant": final_trusses_per_plant,
+            "avg_truss_rate_per_week": avg_truss_rate_per_week,
             "co2_ambient_ppm": params.climate_control.co2_ambient_ppm,
             "max_co2_available_ppm": max_co2_available_ppm,
         },
@@ -236,6 +254,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "dehumidification_elec_kw": round(row.dehumidification_elec_kw, 2),
                 "ventilation_elec_kw": round(row.ventilation_elec_kw, 2),
                 "recirculation_elec_kw": round(row.recirculation_elec_kw, 2),
+                "fruit_set_pct": round(row.fruit_set_pct, 1),
             }
             for row in daily.itertuples()
         ],

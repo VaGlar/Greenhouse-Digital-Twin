@@ -78,6 +78,10 @@ crop:
   fruit_partition_fraction_max: 0.85  # SOURCED: raised from 0.6 to match TOMGRO lit. (Bertin & Gary 1993),
                                     # which reports 80-90% of dry-matter gain to fruit at peak fruiting
   dry_matter_content_fruit: 0.055  # SOURCED: ripe tomato fruit dry matter ~5.5% (USDA composition data, 94.5% water)
+  target_fruit_weight_g: 255.0     # SOURCED: EYRE RZ F1 spec, 230-280g range, midpoint used --
+                                    # see docs/papers/tomato-variety-selection-northern-greece.md
+  fruits_per_truss: 5.0            # SOURCED: generic beef/TOV class benchmark (4-6/truss),
+                                    # not an EYRE RZ F1 datasheet figure -- see same doc
 
 hydroponic:
   system_type: "NFT"   # flag only in v1 — not modeled in depth yet

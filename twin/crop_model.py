@@ -117,6 +117,11 @@ class CropStepResult:
     state: CropState
     gross_assimilation_kg_co2_m2_hour: float
     transpiration_kg_m2_hour: float
+    # The _fruit_set_temp_response factor evaluated this hour (0-1) -- already computed
+    # internally to gate fruit dry-matter partitioning, now also exposed directly as a
+    # real "fruit set %" a grower could read, rather than staying an invisible internal
+    # multiplier.
+    fruit_set_fraction: float
 
 
 def _temperature_response(temp_c: float) -> float:
@@ -369,4 +374,5 @@ class TomatoCropModel:
             state=new_state,
             gross_assimilation_kg_co2_m2_hour=gross_assimilation_kg_co2_m2_hour,
             transpiration_kg_m2_hour=transpiration_kg_m2_hour,
+            fruit_set_fraction=f_fruit_set,
         )

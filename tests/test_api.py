@@ -68,6 +68,9 @@ def test_simulate_response_has_expected_summary_fields():
         "total_ventilation_elec_kwh",
         "total_recirculation_elec_kwh",
         "total_electricity_kwh",
+        "avg_fruit_set_pct",
+        "final_trusses_per_plant",
+        "avg_truss_rate_per_week",
         "co2_ambient_ppm",
         "max_co2_available_ppm",
     ):
@@ -92,6 +95,7 @@ def test_simulate_daily_series_rows_have_expected_fields():
         "dehumidification_elec_kw",
         "ventilation_elec_kw",
         "recirculation_elec_kw",
+        "fruit_set_pct",
     ):
         assert key in row
 
@@ -172,6 +176,28 @@ def test_recirculation_electricity_is_bounded_by_its_fixed_fan_power():
     # never exceed running the whole period at that constant power.
     max_possible_kwh = 4.7 * 5 * 24
     assert 0 < summary["total_recirculation_elec_kwh"] <= max_possible_kwh
+
+
+def test_truss_rate_is_consistent_with_final_yield_and_config_defaults():
+    body = client.post("/simulate", json={"duration_days": 30}).json()
+    summary = body["summary"]
+    config = client.get("/config").json()
+    fruit_weight_g = config["crop"]["target_fruit_weight_g"]
+    fruits_per_truss = config["crop"]["fruits_per_truss"]
+    density = config["crop"]["density_plants_per_m2"]
+
+    expected_trusses_per_plant = (
+        summary["final_yield_kg_m2"] * 1000.0 / density / (fruit_weight_g * fruits_per_truss)
+    )
+    assert summary["final_trusses_per_plant"] == pytest.approx(expected_trusses_per_plant)
+    assert summary["avg_truss_rate_per_week"] == pytest.approx(
+        summary["final_trusses_per_plant"] / (30 / 7.0)
+    )
+
+
+def test_avg_fruit_set_pct_is_within_0_and_100():
+    body = client.post("/simulate", json={"duration_days": 10}).json()
+    assert 0.0 <= body["summary"]["avg_fruit_set_pct"] <= 100.0
 
 
 def test_stricter_dehumidification_setpoint_increases_its_electricity_use():

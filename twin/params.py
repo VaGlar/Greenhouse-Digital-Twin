@@ -234,6 +234,20 @@ class CropParams:
     # Full audit: docs/assumptions/crop-model.md
     fruit_partition_fraction_max: float = 0.85
     dry_matter_content_fruit: float = 0.055  # fraction dry matter of fresh tomato fruit
+    # SOURCED: target fresh fruit weight for this greenhouse's chosen variety class (EYRE RZ
+    # F1, Rijk Zwaan -- 230-280g, midpoint used). Not yet an input to the crop model's own
+    # growth physics (that's still driven by fruit_partition_fraction_max / dry matter
+    # accumulation) -- used as a reporting/derivation constant, converting the model's
+    # continuous fruit dry-matter output into fruit-count-based metrics (trusses/week) that
+    # match how a real grower actually tracks this crop. See
+    # docs/papers/tomato-variety-selection-northern-greece.md.
+    target_fruit_weight_g: float = 255.0
+    # SOURCED: fruits per truss, generic class-level figure for beef/TOV-type indeterminate
+    # greenhouse tomato (4-6 fruits/truss cited across multiple sources) -- not an EYRE RZ F1
+    # datasheet figure (not publicly available), a class-level benchmark. Used alongside
+    # target_fruit_weight_g to derive truss-rate metrics from the model's cumulative fruit
+    # yield. See docs/papers/tomato-variety-selection-northern-greece.md.
+    fruits_per_truss: float = 5.0
 
     def __post_init__(self) -> None:
         if self.density_plants_per_m2 <= 0:
@@ -244,6 +258,10 @@ class CropParams:
             raise ValueError("lai_max must be > 0")
         if not 0 < self.dry_matter_content_fruit < 1:
             raise ValueError("dry_matter_content_fruit must be in (0, 1)")
+        if self.target_fruit_weight_g <= 0:
+            raise ValueError("target_fruit_weight_g must be > 0")
+        if self.fruits_per_truss <= 0:
+            raise ValueError("fruits_per_truss must be > 0")
 
 
 @dataclass

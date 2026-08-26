@@ -239,6 +239,21 @@ def test_fruit_set_temp_response_peaks_within_optimal_window():
     assert _fruit_set_temp_response(18.0) > _fruit_set_temp_response(23.0)
 
 
+def test_step_result_exposes_fruit_set_fraction():
+    model = TomatoCropModel(_crop_params(), ground_area_m2=5000)
+    state = CropState(
+        days_after_planting=50.0, leaf_area_index=3.0, standing_dry_matter_g_m2=1000.0, recent_temp_ema_c=18.0
+    )
+    result = model.step(state, temp_in_c=18.0, co2_in_ppm=900.0, solar_rad_w_m2=500.0, dt_hours=1.0)
+    assert result.fruit_set_fraction == pytest.approx(1.0)
+
+    cold_state = CropState(
+        days_after_planting=50.0, leaf_area_index=3.0, standing_dry_matter_g_m2=1000.0, recent_temp_ema_c=5.0
+    )
+    cold_result = model.step(cold_state, temp_in_c=5.0, co2_in_ppm=900.0, solar_rad_w_m2=500.0, dt_hours=1.0)
+    assert cold_result.fruit_set_fraction == 0.0
+
+
 def test_a_persistently_cold_night_now_reduces_fruit_credit_the_following_day():
     # Regression for the follow-up bug the user caught: after the respiration-deficit
     # fix, yield still rose *without limit* as the night setpoint dropped all the way

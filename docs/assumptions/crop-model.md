@@ -194,6 +194,28 @@ curve's cardinal points directly and the EMA-carries-cold-forward behavior at th
 
 The **structure** of the crop model (light/CO2/temperature/VPD response curves feeding canopy photosynthesis, minus maintenance respiration, partitioned to fruit by growth stage, with CO2 also boosting LAI growth) is a legitimate simplified version of how real crop models like TOMGRO work. Most of the **numbers** are literature-plausible but not individually calibrated to this greenhouse. Baseline 150-day yield at the default config has moved several times as these corrections landed: 13.30 (start) → 20.25 (`fruit_partition_fraction_max`/`T_OPT_C` raised, 2026-08-19) → 20.96 (thermal screen + respiration bug fix, 2026-08-20) → 15.49 (RH setpoint corrected to the literature value, 2026-08-20) → 15.64 (CO2 response capped + half-saturation corrected + CO2→LAI growth channel added, 2026-08-20) → 32.70 (real weather + ventilation-overshoot fix + fan-pad cooling enabled, 2026-08-25) → 13.38 (canopy self-shading fix, 2026-08-25) → 6.47 (nighttime respiration deficit fix, reverted same day — double-counted the loss, see below) → 6.21 (fruit-set temperature sensitivity added on top of the double-counting bug, 2026-08-25) → 13.06 (respiration-reference revision replacing the deficit ledger, 2026-08-25) → 8.95 (dehumidification capacity limit added, 2026-08-25 — see `climate-control.md`'s `dehumidification_capacity_kg_water_per_hour` row; more hours above the RH setpoint lowers VPD, which now feeds photosynthesis). All of the above are 150-day runs. **`simulation.duration_days` itself was then corrected from 150 → 330 (2026-08-25, see its own row above)** — not comparable to the numbers above since it's a different run length; 330-day default config yield was 13.32 kg/m², until **`dehumidification_capacity_kg_water_per_hour` was revised 75 → 771 (2026-08-25, same day, see `climate-control.md`)** after the user flagged 13.32 as implausibly low against their own 30-50 kg/m² expectation for a good harvest — 330-day default config yield is now **39.95 kg/m²**. Each step is documented above with its own rationale — treat the current number as "internally more consistent than before," not as a validated absolute prediction; that still requires this greenhouse's own sensor/yield data.
 
+## Cross-check, 2026-08-26: derived truss rate confirms the known yield gap, doesn't add a new one
+
+Added `target_fruit_weight_g` and `fruits_per_truss` (both new `CropParams` fields, see the
+`variety` row above) to convert the model's continuous cumulative fruit yield into a
+"trusses/week" figure a grower could sanity-check directly, alongside surfacing the crop
+model's existing `_fruit_set_temp_response` factor as a real `fruit_set_pct` output (previously
+computed internally to gate fruit partitioning, never exposed). Neither is new crop-model
+physics -- both are reporting/derivation layers over already-computed state (`api/main.py`).
+
+Running the 330-day default config: `avg_truss_rate_per_week` comes out to **~0.27/week**, well
+below the ~1/week (stable 24h temperature) real commercial benchmark cited in
+`docs/papers/tomato-variety-selection-northern-greece.md`. This is not a new bug -- it's the
+same already-documented yield gap (this model's 39.95 kg/m²/330-day vs. the real commercial
+65-70 kg/m²/year TOV/beef benchmark, see "Bottom line" above) showing up in a different unit.
+Since `avg_truss_rate_per_week` is derived directly from `final_yield_kg_m2` divided by
+`target_fruit_weight_g x fruits_per_truss`, any shortfall in the model's underlying yield
+shows up proportionally here too -- it isn't an independent problem with the new fields
+themselves. `fruit_set_pct` looks physically sensible on its own: ~90-100% through the
+autumn/winter/spring months, dropping to ~50-65% during peak summer heat (temperatures pushing
+past `FRUIT_SET_T_MAX_C`), matching the real-world pattern of summer heat stress hurting fruit
+set.
+
 ## Bug fix: nighttime respiration was a no-op (2026-08-20)
 
 Not a numeric assumption — a logic bug in `twin/crop_model.py`. The standing-biomass update used
