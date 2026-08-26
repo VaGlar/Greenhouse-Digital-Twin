@@ -69,6 +69,7 @@ export interface DailyPoint {
   ventilation_elec_kw: number;
   /** Daily-average electric power (kW) drawn by the recirculation (HAF) fan bank. */
   recirculation_elec_kw: number;
+  [key: string]: unknown;
 }
 
 export interface SimulationResult {
