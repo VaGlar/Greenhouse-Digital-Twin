@@ -120,6 +120,7 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
                 "leaf_area_index": crop_state.leaf_area_index,
                 "standing_dry_matter_g_m2": crop_state.standing_dry_matter_g_m2,
                 "fruit_fresh_yield_kg_m2": crop_state.fruit_fresh_yield_kg_m2,
+                "fruit_set_fraction": crop_result.fruit_set_fraction,
             }
         )
 

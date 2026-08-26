@@ -24,6 +24,43 @@ def _crop_params(**overrides) -> CropParams:
     return CropParams(**defaults)
 
 
+def test_rejects_invalid_stems_per_plant():
+    with pytest.raises(ValueError):
+        _crop_params(stems_per_plant=3)
+
+
+def test_two_stems_per_plant_increases_effective_canopy_density():
+    # Same plants/m2, but a two-stem plant carries roughly twice the leaf area of a
+    # single-stem one -- canopy (and therefore assimilation) should be higher.
+    single_stem = TomatoCropModel(_crop_params(stems_per_plant=1, density_plants_per_m2=1.0), ground_area_m2=5000)
+    two_stem = TomatoCropModel(_crop_params(stems_per_plant=2, density_plants_per_m2=1.0), ground_area_m2=5000)
+    state = CropState(days_after_planting=40.0, leaf_area_index=0.0, standing_dry_matter_g_m2=500.0)
+
+    single_result = single_stem.step(state, temp_in_c=22.0, co2_in_ppm=420.0, solar_rad_w_m2=400.0, dt_hours=1.0)
+    two_result = two_stem.step(state, temp_in_c=22.0, co2_in_ppm=420.0, solar_rad_w_m2=400.0, dt_hours=1.0)
+
+    assert two_result.state.leaf_area_index > single_result.state.leaf_area_index
+
+
+def test_variety_specific_fruit_set_thresholds_are_actually_used():
+    # A "heat-tolerant" variety override (higher fruit_set_t_max_c) should let fruit set
+    # succeed at a temperature that fails under the default thresholds -- proves the
+    # thresholds are wired from CropParams into the step, not still hardcoded.
+    default_model = TomatoCropModel(_crop_params(), ground_area_m2=5000)
+    heat_tolerant_model = TomatoCropModel(_crop_params(fruit_set_t_max_c=32.0), ground_area_m2=5000)
+    hot_state = CropState(
+        days_after_planting=50.0, leaf_area_index=3.0, standing_dry_matter_g_m2=1000.0, recent_temp_ema_c=28.0
+    )
+
+    default_result = default_model.step(hot_state, temp_in_c=28.0, co2_in_ppm=900.0, solar_rad_w_m2=500.0, dt_hours=1.0)
+    heat_tolerant_result = heat_tolerant_model.step(
+        hot_state, temp_in_c=28.0, co2_in_ppm=900.0, solar_rad_w_m2=500.0, dt_hours=1.0
+    )
+
+    assert default_result.fruit_set_fraction == 0.0
+    assert heat_tolerant_result.fruit_set_fraction > 0.0
+
+
 def test_more_light_increases_gross_assimilation():
     model = TomatoCropModel(_crop_params(), ground_area_m2=5000)
     state = CropState(days_after_planting=40.0, leaf_area_index=2.0, standing_dry_matter_g_m2=500.0)
@@ -237,6 +274,21 @@ def test_fruit_set_temp_response_peaks_within_optimal_window():
     assert _fruit_set_temp_response(18.0) == 1.0
     assert _fruit_set_temp_response(18.0) > _fruit_set_temp_response(13.0)
     assert _fruit_set_temp_response(18.0) > _fruit_set_temp_response(23.0)
+
+
+def test_step_result_exposes_fruit_set_fraction():
+    model = TomatoCropModel(_crop_params(), ground_area_m2=5000)
+    state = CropState(
+        days_after_planting=50.0, leaf_area_index=3.0, standing_dry_matter_g_m2=1000.0, recent_temp_ema_c=18.0
+    )
+    result = model.step(state, temp_in_c=18.0, co2_in_ppm=900.0, solar_rad_w_m2=500.0, dt_hours=1.0)
+    assert result.fruit_set_fraction == pytest.approx(1.0)
+
+    cold_state = CropState(
+        days_after_planting=50.0, leaf_area_index=3.0, standing_dry_matter_g_m2=1000.0, recent_temp_ema_c=5.0
+    )
+    cold_result = model.step(cold_state, temp_in_c=5.0, co2_in_ppm=900.0, solar_rad_w_m2=500.0, dt_hours=1.0)
+    assert cold_result.fruit_set_fraction == 0.0
 
 
 def test_a_persistently_cold_night_now_reduces_fruit_credit_the_following_day():

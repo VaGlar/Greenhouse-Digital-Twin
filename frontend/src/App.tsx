@@ -294,6 +294,17 @@ function App() {
       series={buildSeries([{ key: "fruit_fresh_yield_kg_m2", name: "Yield", color: "var(--series-4)" }], isCompare)}
     />
   );
+  const fruitSetChart = (
+    <ComparableChart
+      title="Fruit Set % (επιτυχία γονιμοποίησης)"
+      unit="%"
+      height={220}
+      domain={[0, 100]}
+      data={chartData}
+      xKey={xKey}
+      series={buildSeries([{ key: "fruit_set_pct", name: "Fruit Set", color: "var(--series-3)" }], isCompare)}
+    />
+  );
 
   return (
     <div className="dashboard">
@@ -356,6 +367,22 @@ function App() {
                     onChange={(e) => setCropVariety(e.target.value)}
                   />
                 </div>
+                {config && (
+                  <dl className="spec-list">
+                    <div className="spec-row">
+                      <dt>Target βάρος καρπού</dt>
+                      <dd>{config.crop.target_fruit_weight_g.toFixed(0)} g</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>Καρποί/τσαμπί</dt>
+                      <dd>{config.crop.fruits_per_truss.toFixed(0)}</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>Στελέχη/φυτό</dt>
+                      <dd>{config.crop.stems_per_plant.toFixed(0)}</dd>
+                    </div>
+                  </dl>
+                )}
                 {config && (
                   <CropPhaseTimeline
                     durationDays={sliderValues.duration_days}
@@ -650,7 +677,13 @@ function App() {
                       label="Συνολική παραγωγή"
                       value={`${result.summary.total_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
                     />
+                    <StatTile label="Μέσο Fruit Set" value={`${result.summary.avg_fruit_set_pct.toFixed(0)}%`} />
+                    <StatTile
+                      label="Ρυθμός ταξιανθιών/στέλεχος"
+                      value={`${result.summary.avg_truss_rate_per_week.toFixed(2)}/εβδ`}
+                    />
                   </section>
+                  <div className="chart-grid">{fruitSetChart}</div>
                 </>
               ) : (
                 <p className="side-note">Τρέξε μια προσομοίωση για να δεις αποτελέσματα καλλιέργειας.</p>
@@ -705,6 +738,7 @@ function App() {
               {fanPadChart}
               {rhChart}
               {vpdChart}
+              {fruitSetChart}
             </div>
           )}
 
@@ -871,6 +905,7 @@ const COMPARE_KEYS: (keyof DailyPoint)[] = [
   "dehumidification_elec_kw",
   "ventilation_elec_kw",
   "recirculation_elec_kw",
+  "fruit_set_pct",
 ];
 
 function mergeForCompare(current: DailyPoint[], baseline: DailyPoint[]): Record<string, number>[] {
@@ -976,6 +1011,7 @@ function downloadCsv(result: SimulationResult) {
     "dehumidification_elec_kw",
     "ventilation_elec_kw",
     "recirculation_elec_kw",
+    "fruit_set_pct",
   ] as const;
   const rows = result.daily_series.map((d) => headers.map((h) => d[h]).join(","));
   const csv = [headers.join(","), ...rows].join("\n");

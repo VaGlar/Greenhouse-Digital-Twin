@@ -63,7 +63,11 @@ climate_control:
                                      # docs/assumptions/economics.md
 
 crop:
-  variety: "Beefsteak tomato"      # site-specific placeholder
+  variety: "Beef tomato (EYRE RZ F1-class, ~230-280g)"  # PLACEHOLDER: chosen after checking
+                                    # regional fit, market demand, and a real Northern Greece
+                                    # CHP+hydroponic precedent -- not a confirmed real seed
+                                    # order. See docs/assumptions/crop-model.md and
+                                    # docs/papers/tomato-variety-selection-northern-greece.md.
   planting_date: 2026-09-15        # site-specific placeholder
   density_plants_per_m2: 2.5       # SOURCED: standard commercial single-stem high-wire density 2.3-2.5 plants/m2
                                     # (VT Extension SPES-474; Peet & Welles, "Greenhouse Tomato Production")
@@ -74,6 +78,20 @@ crop:
   fruit_partition_fraction_max: 0.85  # SOURCED: raised from 0.6 to match TOMGRO lit. (Bertin & Gary 1993),
                                     # which reports 80-90% of dry-matter gain to fruit at peak fruiting
   dry_matter_content_fruit: 0.055  # SOURCED: ripe tomato fruit dry matter ~5.5% (USDA composition data, 94.5% water)
+  target_fruit_weight_g: 255.0     # SOURCED: EYRE RZ F1 spec, 230-280g range, midpoint used --
+                                    # see docs/papers/tomato-variety-selection-northern-greece.md
+  fruits_per_truss: 5.0            # SOURCED: generic beef/TOV class benchmark (4-6/truss),
+                                    # not an EYRE RZ F1 datasheet figure -- see same doc
+  stems_per_plant: 1                # SITE-SPECIFIC: 1 for EYRE RZ F1-class (single-stem);
+                                    # set to 2 if a two-stem variety (e.g. Belladona F1) is chosen
+  photosynthesis_t_min_c: 10.0      # SOURCED: moved from twin/crop_model.py constants, same
+  photosynthesis_t_opt_c: 27.0      # values as before -- now per-variety config, not code.
+  photosynthesis_t_max_c: 35.0      # See docs/assumptions/crop-model.md
+  fruit_set_t_min_c: 12.0           # SOURCED: same, for the much narrower fruit-set response --
+  fruit_set_t_opt_c: 18.0           # the trait that actually differs meaningfully between real
+  fruit_set_t_max_c: 24.0           # varieties (e.g. Merlice F1's heat-tolerant fruit set)
+  canopy_light_extinction_coeff: 0.75  # SOURCED: Beer-Lambert k, moved from crop_model.py
+  maintenance_respiration_fraction_per_day: 0.015  # PLACEHOLDER, moved from crop_model.py
 
 hydroponic:
   system_type: "NFT"   # flag only in v1 — not modeled in depth yet
