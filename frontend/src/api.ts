@@ -34,6 +34,14 @@ export interface GreenhouseConfig {
     stems_per_plant: number;
     [key: string]: unknown;
   };
+  hydroponic: {
+    system_type: string;
+    substrate_type: string;
+    ec_target_ms_cm: number;
+    ph_target: number;
+    drainage_target_fraction: number;
+    [key: string]: unknown;
+  };
   simulation: { start_date: string; duration_days: number; timestep_hours: number };
   climate_control: {
     heating_setpoint_day_c: number;
@@ -72,6 +80,16 @@ export interface DailyPoint {
   ventilation_elec_kw: number;
   /** Daily-average electric power (kW) drawn by the recirculation (HAF) fan bank. */
   recirculation_elec_kw: number;
+  /** Daily-average electric power (kW) drawn by the fertigation dosing pump. */
+  fertigation_elec_kw: number;
+  /** Daily total irrigation water volume (liters), derived from the crop's transpiration
+   * demand plus the drainage/leaching fraction (hydroponics.md Level A). */
+  irrigation_water_l_day: number;
+  /** Daily total drained/leached water volume (liters) -- irrigation minus what the crop
+   * actually transpired. */
+  drainage_water_l_day: number;
+  /** Daily total fertilizer mass dosed (grams), derived from irrigation volume and the EC target. */
+  fertilizer_dosed_g_day: number;
   /** Daily-average fruit-set success rate (%) — the _fruit_set_temp_response factor. */
   fruit_set_pct: number;
   [key: string]: unknown;
@@ -92,7 +110,11 @@ export interface SimulationResult {
     total_dehumidification_elec_kwh: number;
     total_ventilation_elec_kwh: number;
     total_recirculation_elec_kwh: number;
+    total_fertigation_elec_kwh: number;
     total_electricity_kwh: number;
+    total_irrigation_water_m3: number;
+    total_drainage_water_m3: number;
+    total_fertilizer_dosed_kg: number;
     avg_fruit_set_pct: number;
     final_trusses_per_stem: number;
     avg_truss_rate_per_week: number;

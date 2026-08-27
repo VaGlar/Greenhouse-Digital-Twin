@@ -170,14 +170,33 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "dehumidification_elec_kw": "mean",
                 "ventilation_elec_kw": "mean",
                 "recirculation_elec_kw": "mean",
+                "fertigation_elec_kw": "mean",
                 "fruit_set_fraction": "mean",
+                # Volumes/masses (unlike the kW rates above) are daily totals, not hourly
+                # averages -- a grower thinks in liters/kg dosed per day, not an average rate.
+                "irrigation_water_kg_per_hour": "sum",
+                "drainage_water_kg_per_hour": "sum",
+                "fertilizer_dosed_g_per_hour": "sum",
             }
         )
         .reset_index()
-        .rename(columns={"screen_deployed": "screen_closed_hours", "fan_pad_active": "fan_pad_active_hours"})
+        .rename(
+            columns={
+                "screen_deployed": "screen_closed_hours",
+                "fan_pad_active": "fan_pad_active_hours",
+                "irrigation_water_kg_per_hour": "irrigation_water_l_day",
+                "drainage_water_kg_per_hour": "drainage_water_l_day",
+                "fertilizer_dosed_g_per_hour": "fertilizer_dosed_g_day",
+            }
+        )
     )
     daily["screen_closed_hours"] = daily["screen_closed_hours"] * params.simulation.timestep_hours
     daily["fan_pad_active_hours"] = daily["fan_pad_active_hours"] * params.simulation.timestep_hours
+    # Same "sum an hourly rate, then scale by timestep_hours" pattern as the hours-fields above --
+    # correct even if timestep_hours isn't exactly 1.
+    daily["irrigation_water_l_day"] = daily["irrigation_water_l_day"] * params.simulation.timestep_hours
+    daily["drainage_water_l_day"] = daily["drainage_water_l_day"] * params.simulation.timestep_hours
+    daily["fertilizer_dosed_g_day"] = daily["fertilizer_dosed_g_day"] * params.simulation.timestep_hours
     daily["co2_in_ppm"] = daily["timestamp"].dt.date.map(daytime_co2_by_day)
     daily["fruit_set_pct"] = daily["fruit_set_fraction"] * 100.0
 
@@ -228,7 +247,18 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
     total_dehumidification_elec_kwh = float(results["dehumidification_elec_kw"].sum() * params.simulation.timestep_hours)
     total_ventilation_elec_kwh = float(results["ventilation_elec_kw"].sum() * params.simulation.timestep_hours)
     total_recirculation_elec_kwh = float(results["recirculation_elec_kw"].sum() * params.simulation.timestep_hours)
-    total_electricity_kwh = total_dehumidification_elec_kwh + total_ventilation_elec_kwh + total_recirculation_elec_kwh
+    total_fertigation_elec_kwh = float(results["fertigation_elec_kw"].sum() * params.simulation.timestep_hours)
+    total_electricity_kwh = (
+        total_dehumidification_elec_kwh
+        + total_ventilation_elec_kwh
+        + total_recirculation_elec_kwh
+        + total_fertigation_elec_kwh
+    )
+    # Hydroponic Level A (see docs/assumptions/hydroponics.md): water/fertilizer totals, derived
+    # from the crop's own transpiration -- not new crop-model physics.
+    total_irrigation_water_m3 = float(results["irrigation_water_kg_per_hour"].sum() * params.simulation.timestep_hours / 1000.0)
+    total_drainage_water_m3 = float(results["drainage_water_kg_per_hour"].sum() * params.simulation.timestep_hours / 1000.0)
+    total_fertilizer_dosed_kg = float(results["fertilizer_dosed_g_per_hour"].sum() * params.simulation.timestep_hours / 1000.0)
     # Theoretical ceiling: the ppm the CHP's full hourly CO2 output would add on top of
     # ambient if every bit of it stayed in the greenhouse air for that hour (zero
     # ventilation loss) -- an upper bound on what "the machine can offer", not a realistic
@@ -252,7 +282,11 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "total_dehumidification_elec_kwh": total_dehumidification_elec_kwh,
             "total_ventilation_elec_kwh": total_ventilation_elec_kwh,
             "total_recirculation_elec_kwh": total_recirculation_elec_kwh,
+            "total_fertigation_elec_kwh": total_fertigation_elec_kwh,
             "total_electricity_kwh": total_electricity_kwh,
+            "total_irrigation_water_m3": total_irrigation_water_m3,
+            "total_drainage_water_m3": total_drainage_water_m3,
+            "total_fertilizer_dosed_kg": total_fertilizer_dosed_kg,
             "avg_fruit_set_pct": avg_fruit_set_pct,
             "final_trusses_per_stem": final_trusses_per_stem,
             "avg_truss_rate_per_week": avg_truss_rate_per_week,
@@ -276,6 +310,10 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "dehumidification_elec_kw": round(row.dehumidification_elec_kw, 2),
                 "ventilation_elec_kw": round(row.ventilation_elec_kw, 2),
                 "recirculation_elec_kw": round(row.recirculation_elec_kw, 2),
+                "fertigation_elec_kw": round(row.fertigation_elec_kw, 2),
+                "irrigation_water_l_day": round(row.irrigation_water_l_day, 1),
+                "drainage_water_l_day": round(row.drainage_water_l_day, 1),
+                "fertilizer_dosed_g_day": round(row.fertilizer_dosed_g_day, 1),
                 "fruit_set_pct": round(row.fruit_set_pct, 1),
             }
             for row in daily.itertuples()

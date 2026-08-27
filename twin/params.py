@@ -311,7 +311,34 @@ class CropParams:
 
 @dataclass
 class HydroponicParams:
-    system_type: str = "NFT"  # flag only in v1; not modeled in depth yet
+    # SOURCED (corrected 2026-08-26): commercial greenhouse tomato is grown on drip-irrigated
+    # substrate (rockwool/coco), not NFT -- NFT is common for leafy greens/lettuce, not
+    # indeterminate high-wire tomato. See docs/papers/tomato-variety-selection-northern-greece.md
+    # (real Northern Greece precedent) and docs/papers/geothermiki-s192g-quote.md (this project's
+    # own vendor quote: Spagnol BravoJet EC/pH fertigation, not an NFT gutter system).
+    system_type: str = "drip_substrate"
+    substrate_type: str = "rockwool"  # descriptive only -- doesn't yet feed the physics
+    ec_target_ms_cm: float = 3.0  # SOURCED: 2.0-3.5 mS/cm is the commonly cited range for
+    # greenhouse tomato (see docs/papers/hydroponic-fertigation-level-a.md)
+    ph_target: float = 6.0  # SOURCED: 5.5-6.5 optimal nutrient-availability range, same source
+    drainage_target_fraction: float = 0.25  # SOURCED: 20-30% leaching fraction is standard
+    # substrate-culture practice (flushes accumulated salts) -- see same source
+    irrigation_pump_specific_power_kwh_per_m3: float = 0.28  # SOURCED (general drip-irrigation
+    # average, not this specific pump) -- see docs/papers/hydroponic-fertigation-level-a.md
+    fertilizer_g_per_l_per_ec_unit: float = 0.64  # PLACEHOLDER: generic EC-to-TDS conversion
+    # factor, not a specific fertilizer blend's real dosing curve -- see same source
+
+    def __post_init__(self) -> None:
+        if self.ec_target_ms_cm <= 0:
+            raise ValueError("ec_target_ms_cm must be > 0")
+        if not 0 < self.ph_target < 14:
+            raise ValueError("ph_target must be in (0, 14)")
+        if not 0 <= self.drainage_target_fraction < 1:
+            raise ValueError("drainage_target_fraction must be in [0, 1)")
+        if self.irrigation_pump_specific_power_kwh_per_m3 <= 0:
+            raise ValueError("irrigation_pump_specific_power_kwh_per_m3 must be > 0")
+        if self.fertilizer_g_per_l_per_ec_unit <= 0:
+            raise ValueError("fertilizer_g_per_l_per_ec_unit must be > 0")
 
 
 @dataclass
