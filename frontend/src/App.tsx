@@ -424,14 +424,6 @@ function App() {
                       <dd>{config.hydroponic.substrate_type}</dd>
                     </div>
                     <div className="spec-row">
-                      <dt>EC θρεπτικού διαλύματος</dt>
-                      <dd>{config.hydroponic.ec_target_ms_cm.toFixed(1)} mS/cm</dd>
-                    </div>
-                    <div className="spec-row">
-                      <dt>pH θρεπτικού διαλύματος</dt>
-                      <dd>{config.hydroponic.ph_target.toFixed(1)}</dd>
-                    </div>
-                    <div className="spec-row">
                       <dt>Στόχος drainage</dt>
                       <dd>{(config.hydroponic.drainage_target_fraction * 100).toFixed(0)}%</dd>
                     </div>
@@ -456,13 +448,27 @@ function App() {
             {activeTab === "recipe" && (
               <>
                 <p className="side-note">
-                  Η λίπανση/άρδευση (EC/pH/drainage) μετακόμισε στο tab «Καλλιέργεια» — πλέον
-                  τροφοδοτεί πραγματικά την προσομοίωση (νερό, ηλεκτρικό αντλίας, λίπασμα). Το
-                  φορτίο καρπού/κλάδεμα (στελέχη/φυτό, καρποί/τσαμπί) βρίσκεται επίσης εκεί. Η
-                  επικονίαση παρακάτω παραμένει <strong>πληροφοριακή</strong> —{" "}
+                  Το EC/pH του θρεπτικού διαλύματος <strong>τροφοδοτεί πραγματικά την
+                  προσομοίωση</strong> (νερό, ηλεκτρικό αντλίας, λίπασμα — δες tab
+                  «Καλλιέργεια» για τα αποτελέσματα, ο στόχος drainage βρίσκεται εκεί). Το
+                  φορτίο καρπού/κλάδεμα (στελέχη/φυτό, καρποί/τσαμπί) βρίσκεται επίσης στο
+                  «Καλλιέργεια». Η επικονίαση παρακάτω παραμένει <strong>πληροφοριακή</strong> —{" "}
                   <strong>δεν επηρεάζει ακόμα την προσομοίωση</strong>. Οι στόχοι κλίματος
                   (θερμοκρασία, CO₂, αφύγρανση) βρίσκονται στο tab «Καιρός».
                 </p>
+                {config && (
+                  <dl className="spec-list">
+                    <div className="spec-section-label">Λίπανση</div>
+                    <div className="spec-row">
+                      <dt>EC θρεπτικού διαλύματος</dt>
+                      <dd>{config.hydroponic.ec_target_ms_cm.toFixed(1)} mS/cm</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>pH θρεπτικού διαλύματος</dt>
+                      <dd>{config.hydroponic.ph_target.toFixed(1)}</dd>
+                    </div>
+                  </dl>
+                )}
                 <dl className="spec-list">
                   <div className="spec-section-label">Επικονίαση</div>
                   <div className="spec-row">
@@ -678,8 +684,6 @@ function App() {
             />
           )}
 
-          {result && <div className="chart-grid pinned-yield">{yieldChart}</div>}
-
           {showSchematic && activeTab === "chp" && result && (
             <section className="stat-row">
               <StatTile label="Τελικό yield" value={`${result.summary.final_yield_kg_m2.toFixed(2)} kg/m²`} />
@@ -803,6 +807,7 @@ function App() {
 
           {activeTab === "charts" && result && (
             <div className="chart-grid">
+              {yieldChart}
               {tempChart}
               {heatChart}
               {electricityChart}
