@@ -4,6 +4,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -135,6 +136,10 @@ function App() {
   const [startDate, setStartDate] = useState("");
   const [weatherPreview, setWeatherPreview] = useState<WeatherPreview | null>(null);
   const [baselineResult, setBaselineResult] = useState<SimulationResult | null>(null);
+  // null = "live" (always the run's last simulated day) -- an explicit index means the user has
+  // scrubbed back to inspect an earlier day, mirroring how this twin will eventually be paused at
+  // "today" while the real greenhouse is mid-cycle, rather than always jumped to the season's end.
+  const [viewedDayIndex, setViewedDayIndex] = useState<number | null>(null);
 
   useEffect(() => {
     getConfig()
@@ -171,6 +176,7 @@ function App() {
         start_date: startDate || undefined,
       };
       setResult(await runSimulation(overrides));
+      setViewedDayIndex(null); // new run -- snap the scrubber back to "live" (its last day)
     } catch (e) {
       setError(String(e));
     } finally {
@@ -186,7 +192,8 @@ function App() {
     setSliderValues((prev) => ({ ...prev, [key]: v }));
   }
 
-  const latestDay = result?.daily_series.at(-1) ?? null;
+  const viewedDayIdx = result ? (viewedDayIndex ?? result.daily_series.length - 1) : 0;
+  const viewedDay = result?.daily_series[viewedDayIdx] ?? null;
   const showSchematic = activeTab === "chp";
   const meanIndoorTempC = result
     ? result.daily_series.reduce((sum, d) => sum + d.temp_in_c, 0) / result.daily_series.length
@@ -194,6 +201,9 @@ function App() {
   const isCompare = Boolean(result && baselineResult);
   const chartData = result ? (baselineResult ? mergeForCompare(result.daily_series, baselineResult.daily_series) : result.daily_series) : [];
   const xKey = isCompare ? "day" : "date";
+  // Where the scrubber's selected day lands on the x-axis -- a plain day index in compare mode,
+  // the matching calendar date otherwise. Only draws a marker when scrubbed back from "live".
+  const viewedX = result && viewedDayIndex !== null ? (isCompare ? viewedDayIndex : result.daily_series[viewedDayIndex]?.date) : undefined;
 
   // Shared chart definitions -- reused across the crop/weather tabs (a relevant subset,
   // so parameter changes are visible without switching tabs) and the charts tab (full set).
@@ -204,6 +214,7 @@ function App() {
       height={260}
       data={chartData}
       xKey={xKey}
+      viewedX={viewedX}
       series={buildSeries(
         [
           { key: "temp_in_c", name: "Εσωτερική", color: "var(--series-1)" },
@@ -221,6 +232,7 @@ function App() {
       height={260}
       data={chartData}
       xKey={xKey}
+      viewedX={viewedX}
       series={buildSeries([{ key: "heat_used_kw", name: "Μέση ισχύς", color: "var(--energy)" }], isCompare)}
     />
   );
@@ -232,6 +244,7 @@ function App() {
       domain={[0, 24]}
       data={chartData}
       xKey={xKey}
+      viewedX={viewedX}
       series={buildSeries([{ key: "screen_closed_hours", name: "Κλειστή", color: "var(--humidity)" }], isCompare)}
     />
   );
@@ -242,6 +255,7 @@ function App() {
       height={260}
       data={chartData}
       xKey={xKey}
+      viewedX={viewedX}
       series={buildSeries(
         [
           { key: "dehumidification_elec_kw", name: "Αφύγρανση", color: "var(--energy)" },
@@ -260,6 +274,7 @@ function App() {
       domain={[0, 24]}
       data={chartData}
       xKey={xKey}
+      viewedX={viewedX}
       series={buildSeries([{ key: "fan_pad_active_hours", name: "Ενεργό", color: "var(--series-1)" }], isCompare)}
     />
   );
@@ -271,6 +286,7 @@ function App() {
       domain={[0, 100]}
       data={chartData}
       xKey={xKey}
+      viewedX={viewedX}
       series={buildSeries([{ key: "rh_in_pct", name: "RH", color: "var(--humidity)" }], isCompare)}
     />
   );
@@ -281,6 +297,7 @@ function App() {
       height={220}
       data={chartData}
       xKey={xKey}
+      viewedX={viewedX}
       series={buildSeries([{ key: "vpd_kpa", name: "VPD", color: "var(--humidity)" }], isCompare)}
     />
   );
@@ -291,6 +308,7 @@ function App() {
       height={320}
       data={chartData}
       xKey={xKey}
+      viewedX={viewedX}
       series={buildSeries([{ key: "fruit_fresh_yield_kg_m2", name: "Yield", color: "var(--series-4)" }], isCompare)}
     />
   );
@@ -302,6 +320,7 @@ function App() {
       domain={[0, 100]}
       data={chartData}
       xKey={xKey}
+      viewedX={viewedX}
       series={buildSeries([{ key: "fruit_set_pct", name: "Fruit Set", color: "var(--series-3)" }], isCompare)}
     />
   );
@@ -445,16 +464,16 @@ function App() {
 
             {activeTab === "chp" && config && (
               <>
-                {result && latestDay && (
+                {result && viewedDay && (
                   <>
                     <PowerGauge
-                      label="Θερμική ισχύς (τελευταία ημέρα)"
-                      value={latestDay.heat_used_kw}
+                      label="Θερμική ισχύς (προβαλλόμενη ημέρα)"
+                      value={viewedDay.heat_used_kw}
                       max={result.summary.max_heat_available_kw}
                       unit=" kW"
                     />
-                    <ScreenStatusBadge hours={latestDay.screen_closed_hours} />
-                    <FanPadStatusBadge hours={latestDay.fan_pad_active_hours} />
+                    <ScreenStatusBadge hours={viewedDay.screen_closed_hours} />
+                    <FanPadStatusBadge hours={viewedDay.fan_pad_active_hours} />
                   </>
                 )}
                 <dl className="spec-list">
@@ -619,19 +638,28 @@ function App() {
         </aside>
 
         <main className="main-area">
+          {result && (
+            <DayScrubber
+              daily={result.daily_series}
+              viewedIndex={viewedDayIdx}
+              isLive={viewedDayIndex === null}
+              onChange={setViewedDayIndex}
+            />
+          )}
+
           {showSchematic && (
             <GreenhouseSchematic
               activeZone={null}
               onZoneClick={handleZoneClick}
-              outdoorTempC={latestDay?.temp_out_c ?? null}
-              indoorTempC={latestDay?.temp_in_c ?? null}
-              rhPct={latestDay?.rh_in_pct ?? null}
-              vpdKpa={latestDay?.vpd_kpa ?? null}
-              co2Ppm={latestDay?.co2_in_ppm ?? null}
+              outdoorTempC={viewedDay?.temp_out_c ?? null}
+              indoorTempC={viewedDay?.temp_in_c ?? null}
+              rhPct={viewedDay?.rh_in_pct ?? null}
+              vpdKpa={viewedDay?.vpd_kpa ?? null}
+              co2Ppm={viewedDay?.co2_in_ppm ?? null}
               screenSavingPct={config ? config.climate_control.screen_energy_saving_fraction * 100 : 55}
               screenDeployedPct={result?.summary.screen_deployed_pct ?? null}
               dehumidSetpointPct={sliderValues.dehumidification_setpoint_pct}
-              yieldKgM2={latestDay?.fruit_fresh_yield_kg_m2 ?? null}
+              yieldKgM2={viewedDay?.fruit_fresh_yield_kg_m2 ?? null}
             />
           )}
 
@@ -759,6 +787,59 @@ function App() {
   );
 }
 
+/** Lets the user "step forward" through an already-completed run's simulated days --
+ * useful now for inspecting an earlier point in the season (the schematic, gauges,
+ * and every ComparableChart's reference-line marker all follow the viewed day), and
+ * the same slider will later double as how this twin gets paused at "today" once it
+ * runs alongside a real, still-in-progress greenhouse rather than a finished batch run. */
+function DayScrubber({
+  daily,
+  viewedIndex,
+  isLive,
+  onChange,
+}: {
+  daily: DailyPoint[];
+  viewedIndex: number;
+  isLive: boolean;
+  onChange: (index: number | null) => void;
+}) {
+  const maxIdx = daily.length - 1;
+  const viewedDate = daily[viewedIndex]?.date;
+  const presetDays = [10, 20, 50, 100, 200].filter((d) => d <= maxIdx + 1);
+
+  return (
+    <section className="day-scrubber">
+      <div className="day-scrubber-head">
+        <span className="day-scrubber-label">
+          Ημέρα {viewedIndex + 1} / {maxIdx + 1}
+          {viewedDate ? ` · ${viewedDate}` : ""}
+          {isLive && <span className="day-scrubber-live"> · τρέχουσα</span>}
+        </span>
+        {!isLive && (
+          <button className="secondary-button" onClick={() => onChange(null)}>
+            ⏭ Μετάβαση στο τέλος
+          </button>
+        )}
+      </div>
+      <input
+        type="range"
+        className="day-scrubber-range"
+        min={0}
+        max={maxIdx}
+        value={viewedIndex}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+      <div className="day-scrubber-presets">
+        {presetDays.map((d) => (
+          <button key={d} className="day-scrubber-chip" onClick={() => onChange(d - 1)}>
+            Ημέρα {d}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="stat-tile">
@@ -789,7 +870,7 @@ function PowerGauge({ label, value, max, unit }: { label: string; value: number;
   );
 }
 
-/** Thermal-screen deployment for the last simulated day, as a fraction of 24h —
+/** Thermal-screen deployment for the viewed simulation day, as a fraction of 24h —
  * the screen's automatic controller (see twin/climate_model.py) has no single
  * on/off "now" state, only how many hours it was closed that day. */
 function ScreenStatusBadge({ hours }: { hours: number }) {
@@ -798,7 +879,7 @@ function ScreenStatusBadge({ hours }: { hours: number }) {
   return (
     <div className="gauge">
       <div className="gauge-head">
-        <span className="gauge-label">Θερμοκουρτίνα (τελευταία ημέρα)</span>
+        <span className="gauge-label">Θερμοκουρτίνα (προβαλλόμενη ημέρα)</span>
         <span className="gauge-value">
           {state} — {hours.toFixed(1)}/24h
         </span>
@@ -810,7 +891,7 @@ function ScreenStatusBadge({ hours }: { hours: number }) {
   );
 }
 
-/** Fan-pad engagement for the last simulated day, as a fraction of 24h -- same
+/** Fan-pad engagement for the viewed simulation day, as a fraction of 24h -- same
  * caveat as ScreenStatusBadge: no single on/off "now" state, only hours engaged
  * that day (twin/climate_model.py: fan_pad_active = enabled and ach > vent_min_ach). */
 function FanPadStatusBadge({ hours }: { hours: number }) {
@@ -818,7 +899,7 @@ function FanPadStatusBadge({ hours }: { hours: number }) {
   return (
     <div className="gauge">
       <div className="gauge-head">
-        <span className="gauge-label">Fan-pad ψύξη (τελευταία ημέρα)</span>
+        <span className="gauge-label">Fan-pad ψύξη (προβαλλόμενη ημέρα)</span>
         <span className="gauge-value">{hours.toFixed(1)}/24h</span>
       </div>
       <div className="gauge-track">
@@ -957,6 +1038,7 @@ function ComparableChart({
   domain,
   data,
   xKey,
+  viewedX,
   series,
 }: {
   title: string;
@@ -966,6 +1048,7 @@ function ComparableChart({
   domain?: [number, number];
   data: Record<string, unknown>[];
   xKey: string;
+  viewedX?: string | number;
   series: ChartSeriesDef[];
 }) {
   return (
@@ -985,6 +1068,9 @@ function ComparableChart({
           <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit={unit} width={56} domain={domain} />
           <Tooltip contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }} />
           <Legend />
+          {viewedX !== undefined && (
+            <ReferenceLine x={viewedX} stroke="var(--amber)" strokeDasharray="3 3" strokeWidth={1.5} />
+          )}
           {series.map((s) => (
             <Line
               key={s.dataKey}
