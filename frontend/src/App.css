@@ -612,10 +612,6 @@ body {
   gap: 16px;
 }
 
-.chart-grid.pinned-yield {
-  margin-bottom: 16px;
-}
-
 .chart-card {
   background: var(--surface-1);
   border: 1px solid var(--gridline);
