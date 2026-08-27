@@ -519,6 +519,65 @@ body {
   margin: 0;
 }
 
+/* ── Day scrubber ── */
+.day-scrubber {
+  background: var(--surface-1);
+  border: 1px solid var(--gridline);
+  border-radius: 3px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.day-scrubber-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.day-scrubber-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.day-scrubber-live {
+  color: var(--series-3);
+  font-weight: 500;
+}
+
+.day-scrubber-range {
+  width: 100%;
+  accent-color: var(--amber);
+}
+
+.day-scrubber-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.day-scrubber-chip {
+  background: var(--page);
+  color: var(--text-secondary);
+  border: 1px solid var(--gridline);
+  border-radius: 2px;
+  padding: 3px 9px;
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.day-scrubber-chip:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
 .stat-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
