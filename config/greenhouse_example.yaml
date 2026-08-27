@@ -94,7 +94,16 @@ crop:
   maintenance_respiration_fraction_per_day: 0.015  # PLACEHOLDER, moved from crop_model.py
 
 hydroponic:
-  system_type: "NFT"   # flag only in v1 — not modeled in depth yet
+  system_type: "drip_substrate"   # SOURCED (corrected 2026-08-26, was "NFT"): real commercial
+                                   # greenhouse tomato uses drip-irrigated substrate, not NFT.
+                                   # See docs/assumptions/hydroponics.md.
+  substrate_type: "rockwool"      # descriptive only, doesn't yet feed the physics
+  ec_target_ms_cm: 3.0            # SOURCED: 2.0-3.5 mS/cm commonly cited range for greenhouse tomato
+  ph_target: 6.0                  # SOURCED: 5.5-6.5 optimal nutrient-availability range
+  drainage_target_fraction: 0.25  # SOURCED: 20-30% standard leaching fraction for substrate culture
+  irrigation_pump_specific_power_kwh_per_m3: 0.28  # SOURCED: general drip-irrigation average
+                                                    # (not this specific pump's spec)
+  fertilizer_g_per_l_per_ec_unit: 0.64  # PLACEHOLDER: generic EC-to-TDS conversion factor
 
 weather:
   source: "csv_typical_year"   # SOURCED: real 10-year (2015-2024) hourly average for Αλεξάνδρεια Ημαθίας, via the

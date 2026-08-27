@@ -94,6 +94,25 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
         recirculation_active = climate_result.vent_ach <= params.climate_control.vent_min_ach
         recirculation_elec_kw = params.climate_control.recirculation_fan_power_kw if recirculation_active else 0.0
 
+        # Fertigation (Hydroponic Level A -- see docs/assumptions/hydroponics.md): irrigation
+        # volume is derived from the crop's own transpiration demand (already computed above for
+        # the humidity balance) plus a deliberate leaching fraction, matching how a real
+        # drip-substrate system is scheduled -- not a new crop-model input, a reporting/derivation
+        # layer over existing state, same pattern as the electricity fields above. Water density
+        # ~1000 kg/m3, so kg and liters are numerically interchangeable here.
+        irrigation_water_kg_per_hour = transpiration_kg_per_hour / (
+            1.0 - params.hydroponic.drainage_target_fraction
+        )
+        drainage_water_kg_per_hour = irrigation_water_kg_per_hour - transpiration_kg_per_hour
+        fertigation_elec_kw = (
+            irrigation_water_kg_per_hour / 1000.0 * params.hydroponic.irrigation_pump_specific_power_kwh_per_m3
+        )
+        fertilizer_dosed_g_per_hour = (
+            irrigation_water_kg_per_hour
+            * params.hydroponic.ec_target_ms_cm
+            * params.hydroponic.fertilizer_g_per_l_per_ec_unit
+        )
+
         records.append(
             {
                 "timestamp": row["timestamp"],
@@ -121,6 +140,10 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
                 "standing_dry_matter_g_m2": crop_state.standing_dry_matter_g_m2,
                 "fruit_fresh_yield_kg_m2": crop_state.fruit_fresh_yield_kg_m2,
                 "fruit_set_fraction": crop_result.fruit_set_fraction,
+                "irrigation_water_kg_per_hour": irrigation_water_kg_per_hour,
+                "drainage_water_kg_per_hour": drainage_water_kg_per_hour,
+                "fertigation_elec_kw": fertigation_elec_kw,
+                "fertilizer_dosed_g_per_hour": fertilizer_dosed_g_per_hour,
             }
         )
 

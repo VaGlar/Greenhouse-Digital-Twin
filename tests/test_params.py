@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from twin.params import ClimateControlParams
+from twin.params import ClimateControlParams, HydroponicParams
 
 
 def _params(**overrides):
@@ -40,3 +40,31 @@ def test_rejects_co2_day_setpoint_below_ambient():
 
 def test_accepts_co2_day_setpoint_equal_to_ambient():
     _params(co2_setpoint_day_ppm=420.0, co2_ambient_ppm=420.0)
+
+
+# -- HydroponicParams (hydroponics.md Level A) --
+
+
+def test_hydroponic_params_rejects_zero_ec_target():
+    with pytest.raises(ValueError, match="ec_target_ms_cm"):
+        HydroponicParams(ec_target_ms_cm=0.0)
+
+
+def test_hydroponic_params_rejects_ph_target_out_of_range():
+    with pytest.raises(ValueError, match="ph_target"):
+        HydroponicParams(ph_target=14.0)
+
+
+def test_hydroponic_params_rejects_drainage_fraction_of_one():
+    with pytest.raises(ValueError, match="drainage_target_fraction"):
+        HydroponicParams(drainage_target_fraction=1.0)
+
+
+def test_hydroponic_params_rejects_zero_pump_specific_power():
+    with pytest.raises(ValueError, match="irrigation_pump_specific_power_kwh_per_m3"):
+        HydroponicParams(irrigation_pump_specific_power_kwh_per_m3=0.0)
+
+
+def test_hydroponic_params_rejects_zero_fertilizer_conversion_factor():
+    with pytest.raises(ValueError, match="fertilizer_g_per_l_per_ec_unit"):
+        HydroponicParams(fertilizer_g_per_l_per_ec_unit=0.0)

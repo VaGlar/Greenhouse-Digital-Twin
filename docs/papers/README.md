@@ -39,5 +39,6 @@ One file per source used in `docs/assumptions/`. This session's sandboxed enviro
 | [`greenhouse-electricity-consumption.md`](./greenhouse-electricity-consumption.md) | `climate_control.dehumidification_specific_power_kwh_per_kg`, `climate_control.ventilation_specific_fan_power_w_per_m3h` |
 | [`tomato-variety-selection-northern-greece.md`](./tomato-variety-selection-northern-greece.md) | `crop.variety` |
 | [`tomato-truss-rate-benchmark.md`](./tomato-truss-rate-benchmark.md) | `summary.avg_truss_rate_per_week`, `summary.steady_state_truss_rate_per_week` — corrects a miscited comparison benchmark |
+| [`hydroponic-fertigation-level-a.md`](./hydroponic-fertigation-level-a.md) | `hydroponic.ec_target_ms_cm`, `hydroponic.ph_target`, `hydroponic.drainage_target_fraction`, `hydroponic.irrigation_pump_specific_power_kwh_per_m3`, `hydroponic.fertilizer_g_per_l_per_ec_unit` |
 
 See [`docs/sources.xlsx`](../sources.xlsx) for the full table (variable, code variable, explanation, source) in one spreadsheet.

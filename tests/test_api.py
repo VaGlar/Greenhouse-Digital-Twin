@@ -67,7 +67,11 @@ def test_simulate_response_has_expected_summary_fields():
         "total_dehumidification_elec_kwh",
         "total_ventilation_elec_kwh",
         "total_recirculation_elec_kwh",
+        "total_fertigation_elec_kwh",
         "total_electricity_kwh",
+        "total_irrigation_water_m3",
+        "total_drainage_water_m3",
+        "total_fertilizer_dosed_kg",
         "avg_fruit_set_pct",
         "final_trusses_per_stem",
         "avg_truss_rate_per_week",
@@ -97,6 +101,10 @@ def test_simulate_daily_series_rows_have_expected_fields():
         "dehumidification_elec_kw",
         "ventilation_elec_kw",
         "recirculation_elec_kw",
+        "fertigation_elec_kw",
+        "irrigation_water_l_day",
+        "drainage_water_l_day",
+        "fertilizer_dosed_g_day",
         "fruit_set_pct",
     ):
         assert key in row
@@ -167,7 +175,49 @@ def test_total_electricity_kwh_is_sum_of_its_components():
         summary["total_dehumidification_elec_kwh"]
         + summary["total_ventilation_elec_kwh"]
         + summary["total_recirculation_elec_kwh"]
+        + summary["total_fertigation_elec_kwh"]
     )
+
+
+# -- hydroponics (Level A: fertigation water/electricity, derived from transpiration) --
+
+
+def test_drainage_water_is_irrigation_minus_transpiration_and_matches_drainage_fraction():
+    body = client.post("/simulate", json={"duration_days": 10}).json()
+    summary = body["summary"]
+    config = client.get("/config").json()
+    drainage_fraction = config["hydroponic"]["drainage_target_fraction"]
+
+    assert summary["total_drainage_water_m3"] > 0
+    # drainage = irrigation * drainage_fraction, by construction (irrigation = transpiration /
+    # (1 - fraction), so drainage = irrigation - transpiration = irrigation * fraction).
+    assert summary["total_drainage_water_m3"] == pytest.approx(
+        summary["total_irrigation_water_m3"] * drainage_fraction, rel=1e-6
+    )
+    assert summary["total_irrigation_water_m3"] > summary["total_drainage_water_m3"]
+
+
+def test_fertilizer_dosed_is_consistent_with_irrigation_volume_and_ec_target():
+    summary = client.post("/simulate", json={"duration_days": 10}).json()["summary"]
+    # SimulationOverrides has no ec_target field yet -- Level A only exposes it via config, not
+    # as a request override -- so cross-check the derivation formula against config defaults.
+    config = client.get("/config").json()
+    ec = config["hydroponic"]["ec_target_ms_cm"]
+    fertilizer_g_per_l_per_ec = config["hydroponic"]["fertilizer_g_per_l_per_ec_unit"]
+    expected_fertilizer_kg = summary["total_irrigation_water_m3"] * 1000.0 * ec * fertilizer_g_per_l_per_ec / 1000.0
+    assert summary["total_fertilizer_dosed_kg"] == pytest.approx(expected_fertilizer_kg, rel=1e-6)
+
+
+def test_fertigation_electricity_is_zero_when_transpiration_is_zero():
+    # duration_days=1 starting at night-heavy winter date still has some daylight hours with
+    # transpiration, so instead directly verify the zero-transpiration-hour behavior via the
+    # daily series: any day with irrigation_water_l_day == 0 must also have fertigation_elec_kw
+    # averaging to 0 and no fertilizer dosed.
+    body = client.post("/simulate", json={"duration_days": 5}).json()
+    for row in body["daily_series"]:
+        if row["irrigation_water_l_day"] == 0:
+            assert row["fertigation_elec_kw"] == 0
+            assert row["fertilizer_dosed_g_day"] == 0
 
 
 def test_recirculation_electricity_is_bounded_by_its_fixed_fan_power():

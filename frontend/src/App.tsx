@@ -261,6 +261,7 @@ function App() {
           { key: "dehumidification_elec_kw", name: "Αφύγρανση", color: "var(--energy)" },
           { key: "ventilation_elec_kw", name: "Αερισμός/fan-pad", color: "var(--series-2)" },
           { key: "recirculation_elec_kw", name: "Ανακυκλοφορία", color: "var(--series-1)" },
+          { key: "fertigation_elec_kw", name: "Λίπανση/άρδευση", color: "var(--humidity)" },
         ],
         isCompare,
       )}
@@ -322,6 +323,24 @@ function App() {
       xKey={xKey}
       viewedX={viewedX}
       series={buildSeries([{ key: "fruit_set_pct", name: "Fruit Set", color: "var(--series-3)" }], isCompare)}
+    />
+  );
+  const irrigationChart = (
+    <ComparableChart
+      title="Άρδευση / στράγγιση (L/ημέρα)"
+      subtitle="Η άρδευση ακολουθεί τη διαπνοή του φυτού συν το στόχο drainage — δες tab «Καλλιέργεια»."
+      unit=" L"
+      height={220}
+      data={chartData}
+      xKey={xKey}
+      viewedX={viewedX}
+      series={buildSeries(
+        [
+          { key: "irrigation_water_l_day", name: "Άρδευση", color: "var(--humidity)" },
+          { key: "drainage_water_l_day", name: "Στράγγιση", color: "var(--series-2)" },
+        ],
+        isCompare,
+      )}
     />
   );
 
@@ -400,6 +419,22 @@ function App() {
                       <dt>Στελέχη/φυτό</dt>
                       <dd>{config.crop.stems_per_plant.toFixed(0)}</dd>
                     </div>
+                    <div className="spec-row spec-row-section">
+                      <dt>Σύστημα υδροπονίας</dt>
+                      <dd>{config.hydroponic.substrate_type}</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>EC θρεπτικού διαλύματος</dt>
+                      <dd>{config.hydroponic.ec_target_ms_cm.toFixed(1)} mS/cm</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>pH θρεπτικού διαλύματος</dt>
+                      <dd>{config.hydroponic.ph_target.toFixed(1)}</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>Στόχος drainage</dt>
+                      <dd>{(config.hydroponic.drainage_target_fraction * 100).toFixed(0)}%</dd>
+                    </div>
                   </dl>
                 )}
                 {config && (
@@ -421,34 +456,14 @@ function App() {
             {activeTab === "recipe" && (
               <>
                 <p className="side-note">
-                  Πληροφοριακές τιμές αναφοράς για εμπορική καλλιέργεια τομάτας υψηλού καλωδίου —
-                  <strong> δεν επηρεάζουν την προσομοίωση</strong>, καθώς λίπανση/άρδευση/κλάδεμα
-                  δεν είναι ακόμα μοντελοποιημένα (δες README roadmap). Οι στόχοι κλίματος
+                  Η λίπανση/άρδευση (EC/pH/drainage) μετακόμισε στο tab «Καλλιέργεια» — πλέον
+                  τροφοδοτεί πραγματικά την προσομοίωση (νερό, ηλεκτρικό αντλίας, λίπασμα). Το
+                  φορτίο καρπού/κλάδεμα (στελέχη/φυτό, καρποί/τσαμπί) βρίσκεται επίσης εκεί. Η
+                  επικονίαση παρακάτω παραμένει <strong>πληροφοριακή</strong> —{" "}
+                  <strong>δεν επηρεάζει ακόμα την προσομοίωση</strong>. Οι στόχοι κλίματος
                   (θερμοκρασία, CO₂, αφύγρανση) βρίσκονται στο tab «Καιρός».
                 </p>
                 <dl className="spec-list">
-                  <div className="spec-section-label">Λίπανση / Άρδευση</div>
-                  <div className="spec-row">
-                    <dt>EC θρεπτικού διαλύματος</dt>
-                    <dd>2.5–3.5 mS/cm</dd>
-                  </div>
-                  <div className="spec-row">
-                    <dt>pH θρεπτικού διαλύματος</dt>
-                    <dd>5.5–6.5</dd>
-                  </div>
-                  <div className="spec-row">
-                    <dt>Στόχος drainage</dt>
-                    <dd>20–30%</dd>
-                  </div>
-                  <div className="spec-section-label">Κλάδεμα / Φορτίο καρπού</div>
-                  <div className="spec-row">
-                    <dt>Σύστημα</dt>
-                    <dd>Single-stem, high-wire</dd>
-                  </div>
-                  <div className="spec-row">
-                    <dt>Καρποί/ταξιανθία (θέρισμα)</dt>
-                    <dd>4–6</dd>
-                  </div>
                   <div className="spec-section-label">Επικονίαση</div>
                   <div className="spec-row">
                     <dt>Μέθοδος</dt>
@@ -719,7 +734,28 @@ function App() {
                       }
                     />
                   </section>
-                  <div className="chart-grid">{fruitSetChart}</div>
+                  <section className="stat-row">
+                    <StatTile
+                      label="Συνολική άρδευση"
+                      value={`${result.summary.total_irrigation_water_m3.toLocaleString(undefined, { maximumFractionDigits: 0 })} m³`}
+                    />
+                    <StatTile
+                      label="Συνολική στράγγιση"
+                      value={`${result.summary.total_drainage_water_m3.toLocaleString(undefined, { maximumFractionDigits: 0 })} m³`}
+                    />
+                    <StatTile
+                      label="Λίπασμα δοσομετρημένο"
+                      value={`${result.summary.total_fertilizer_dosed_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
+                    />
+                    <StatTile
+                      label="Ηλεκτρικό λίπανσης/άρδευσης"
+                      value={`${result.summary.total_fertigation_elec_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`}
+                    />
+                  </section>
+                  <div className="chart-grid">
+                    {fruitSetChart}
+                    {irrigationChart}
+                  </div>
                 </>
               ) : (
                 <p className="side-note">Τρέξε μια προσομοίωση για να δεις αποτελέσματα καλλιέργειας.</p>
@@ -775,6 +811,7 @@ function App() {
               {rhChart}
               {vpdChart}
               {fruitSetChart}
+              {irrigationChart}
             </div>
           )}
 
@@ -994,6 +1031,10 @@ const COMPARE_KEYS: (keyof DailyPoint)[] = [
   "dehumidification_elec_kw",
   "ventilation_elec_kw",
   "recirculation_elec_kw",
+  "fertigation_elec_kw",
+  "irrigation_water_l_day",
+  "drainage_water_l_day",
+  "fertilizer_dosed_g_day",
   "fruit_set_pct",
 ];
 
@@ -1105,6 +1146,10 @@ function downloadCsv(result: SimulationResult) {
     "dehumidification_elec_kw",
     "ventilation_elec_kw",
     "recirculation_elec_kw",
+    "fertigation_elec_kw",
+    "irrigation_water_l_day",
+    "drainage_water_l_day",
+    "fertilizer_dosed_g_day",
     "fruit_set_pct",
   ] as const;
   const rows = result.daily_series.map((d) => headers.map((h) => d[h]).join(","));
