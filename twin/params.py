@@ -346,6 +346,35 @@ class HydroponicParams:
     # PLACEHOLDER: cap on B2's yield-loss fraction regardless of how far EC exceeds the threshold.
     ber_yield_loss_fraction_max: float = 0.35
 
+    # -- Level B, low-EC side: nutrient deficiency -> yield loss (real tomato EC/yield response is
+    # bell-shaped, not monotonic -- B1/B2 above only penalize high EC. A too-dilute solution starves
+    # the plant of nutrients, reducing total growth/fruit set, not just fruit concentration (a
+    # different mechanism from B1's dry-matter/quality effect). SOURCED threshold/direction: real
+    # trials found peak tomato yield around EC 3 dS/m, with yield falling off on *both* sides
+    # (e.g. one study found the highest yield at 3 dS/m, rising from 0, falling above it); matches
+    # the commonly-cited 2.0-3.5 mS/cm target range's own low end (see Level A above). See
+    # docs/assumptions/hydroponics.md.
+    ec_deficiency_threshold_ms_cm: float = 2.0
+    # PLACEHOLDER slope: steeper than the BER slope above -- a fully nutrient-starved solution
+    # (EC -> 0) constrains total plant growth directly, a more severe constraint than BER's
+    # fruit-specific quality effect, so it is allowed a higher slope and cap.
+    ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold: float = 0.15
+    ec_deficiency_yield_loss_fraction_max: float = 0.50
+
+    # -- Level B: pH -> nutrient availability -> marketable yield loss --
+    # SOURCED range: 5.5-6.5 is the standard nutrient-availability optimum (same source as
+    # ph_target above) -- outside it, specific nutrients become chemically unavailable to the
+    # plant even if present in solution (a real, well-documented mechanism -- classic soilless-
+    # culture nutrient-availability charts). A trial testing pH 4.5/5.0/5.5/6.0/6.5 found the
+    # highest tomato yield at pH 5.5, within this range. See docs/assumptions/hydroponics.md.
+    ph_min_optimal: float = 5.5
+    ph_max_optimal: float = 6.5
+    # PLACEHOLDER magnitude: no quantified tomato-specific yield-loss percentage was found for
+    # pH excursions, so this reuses the same sufficiency-range-penalty shape as the damped N/K/
+    # Mg/B tier below -- but with a higher cap than any single nutrient there, since pH gates
+    # the availability of *all* nutrients simultaneously, not just one.
+    ph_availability_penalty_cap_fraction: float = 0.15
+
     # -- Recipe "damped" tier: N, K, Mg, B -- real mechanism, deliberately small/capped magnitude.
     # Each nutrient's `_ppm` is the recipe's actual target concentration; `_min_optimal_ppm` /
     # `_max_optimal_ppm` is the sufficiency range within which it costs nothing. Ranges are
@@ -403,6 +432,18 @@ class HydroponicParams:
             raise ValueError("ber_yield_loss_fraction_per_ms_cm_above_threshold must be >= 0")
         if not 0 < self.ber_yield_loss_fraction_max <= 1:
             raise ValueError("ber_yield_loss_fraction_max must be in (0, 1]")
+        if self.ec_deficiency_threshold_ms_cm <= 0:
+            raise ValueError("ec_deficiency_threshold_ms_cm must be > 0")
+        if self.ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold < 0:
+            raise ValueError("ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold must be >= 0")
+        if not 0 < self.ec_deficiency_yield_loss_fraction_max <= 1:
+            raise ValueError("ec_deficiency_yield_loss_fraction_max must be in (0, 1]")
+        if not 0 < self.ph_min_optimal < 14:
+            raise ValueError("ph_min_optimal must be in (0, 14)")
+        if not self.ph_min_optimal < self.ph_max_optimal < 14:
+            raise ValueError("ph_max_optimal must be > ph_min_optimal and < 14")
+        if not 0 <= self.ph_availability_penalty_cap_fraction <= 1:
+            raise ValueError("ph_availability_penalty_cap_fraction must be in [0, 1]")
         for label, lo, hi in (
             ("n", self.n_min_optimal_ppm, self.n_max_optimal_ppm),
             ("k", self.k_min_optimal_ppm, self.k_max_optimal_ppm),
@@ -435,16 +476,42 @@ class HydroponicParams:
         excess = max(0.0, self.ec_target_ms_cm - self.ec_ber_threshold_ms_cm)
         return min(self.ber_yield_loss_fraction_max, self.ber_yield_loss_fraction_per_ms_cm_above_threshold * excess)
 
-    def _nutrient_penalty(self, value: float, min_optimal: float, max_optimal: float) -> float:
-        """Damped recipe tier: 0 inside [min_optimal, max_optimal], ramping linearly to
-        `damped_nutrient_penalty_cap_fraction` once `value` is a full range-width beyond
+    @property
+    def ec_deficiency_yield_loss_fraction(self) -> float:
+        """Level B, low-EC side: nutrient-deficiency yield loss fraction below
+        `ec_deficiency_threshold_ms_cm` -- the low-EC half of the real, bell-shaped tomato
+        EC/yield response (B2 above only covers the high-EC/BER half).
+        """
+        deficit = max(0.0, self.ec_deficiency_threshold_ms_cm - self.ec_target_ms_cm)
+        return min(
+            self.ec_deficiency_yield_loss_fraction_max,
+            self.ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold * deficit,
+        )
+
+    def _nutrient_penalty(
+        self, value: float, min_optimal: float, max_optimal: float, cap_fraction: float | None = None
+    ) -> float:
+        """Sufficiency-range penalty shape shared by the damped N/K/Mg/B tier and pH: 0 inside
+        [min_optimal, max_optimal], ramping linearly to `cap_fraction` (defaults to
+        `damped_nutrient_penalty_cap_fraction`) once `value` is a full range-width beyond
         whichever boundary it's outside of, capped there.
         """
         if min_optimal <= value <= max_optimal:
             return 0.0
+        cap = self.damped_nutrient_penalty_cap_fraction if cap_fraction is None else cap_fraction
         range_width = max_optimal - min_optimal
         distance = min_optimal - value if value < min_optimal else value - max_optimal
-        return min(self.damped_nutrient_penalty_cap_fraction, self.damped_nutrient_penalty_cap_fraction * distance / range_width)
+        return min(cap, cap * distance / range_width)
+
+    @property
+    def ph_availability_multiplier(self) -> float:
+        """Level B: pH-driven nutrient-availability yield loss, applied as its own factor
+        (distinct from recipe_adequacy_multiplier) since pH gates availability of every
+        nutrient at once, not one specific nutrient's concentration.
+        """
+        return 1.0 - self._nutrient_penalty(
+            self.ph_target, self.ph_min_optimal, self.ph_max_optimal, cap_fraction=self.ph_availability_penalty_cap_fraction
+        )
 
     @property
     def recipe_adequacy_multiplier(self) -> float:

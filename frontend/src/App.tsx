@@ -50,6 +50,7 @@ type SliderKey =
   | "dehumidification_setpoint_pct"
   | "duration_days"
   | "ec_target_ms_cm"
+  | "ph_target"
   | "n_ppm"
   | "k_ppm"
   | "mg_ppm"
@@ -133,7 +134,17 @@ const RECIPE_SLIDERS: SliderDef[] = [
     max: 6.0,
     step: 0.1,
     optimal: [2.0, 3.5],
-    note: "2.0-3.5 mS/cm εμπορικό στάνταρ. Πάνω από 3.5 (BER threshold) αυξάνεται ο κίνδυνος Blossom End Rot· η ξηρή ουσία καρπού (και άρα το μειωμένο νωπό βάρος) αυξάνει γραμμικά με το EC σε όλο το εύρος.",
+    note: "Καμπανοειδής επίδραση στο yield, όχι γραμμική: 2.0-3.5 mS/cm εμπορικό στάνταρ/peak yield. Κάτω από 2.0 αυξάνεται ο κίνδυνος έλλειψης θρεπτικών (μειωμένη ανάπτυξη)· πάνω από 3.5 αυξάνεται ο κίνδυνος BER (Blossom End Rot) από αλατότητα. Η ξηρή ουσία καρπού αυξάνει ελαφρώς και γραμμικά με το EC σε όλο το εύρος (μικρή επίδραση).",
+  },
+  {
+    key: "ph_target",
+    label: "pH θρεπτικού διαλύματος",
+    unit: "",
+    min: 4.5,
+    max: 8.0,
+    step: 0.1,
+    optimal: [5.5, 6.5],
+    note: "Εκτός 5.5-6.5, συγκεκριμένα θρεπτικά γίνονται χημικά μη διαθέσιμα στο φυτό ακόμα κι αν υπάρχουν στο διάλυμα -- γκαρδάρει όλα τα θρεπτικά ταυτόχρονα, όχι μόνο ένα.",
   },
   {
     key: "n_ppm",
@@ -185,6 +196,7 @@ const DEFAULT_SLIDER_VALUES: Record<SliderKey, number> = {
   dehumidification_setpoint_pct: 70,
   duration_days: 330,
   ec_target_ms_cm: 3.0,
+  ph_target: 6.0,
   n_ppm: 105,
   k_ppm: 300,
   mg_ppm: 65,
@@ -219,6 +231,7 @@ function App() {
           dehumidification_setpoint_pct: c.climate_control.dehumidification_setpoint_pct,
           duration_days: c.simulation.duration_days,
           ec_target_ms_cm: c.hydroponic.ec_target_ms_cm,
+          ph_target: c.hydroponic.ph_target,
           n_ppm: c.hydroponic.n_ppm,
           k_ppm: c.hydroponic.k_ppm,
           mg_ppm: c.hydroponic.mg_ppm,
@@ -534,14 +547,6 @@ function App() {
                 ))}
                 {config && (
                   <dl className="spec-list">
-                    <div className="spec-row">
-                      <dt>pH θρεπτικού διαλύματος</dt>
-                      <dd>{config.hydroponic.ph_target.toFixed(1)}</dd>
-                    </div>
-                  </dl>
-                )}
-                {config && (
-                  <dl className="spec-list">
                     <div className="spec-section-label">Λοιπά στοιχεία, επικονίαση — πληροφοριακά, χωρίς effect</div>
                     <div className="spec-row">
                       <dt>P / S / Fe</dt>
@@ -803,8 +808,16 @@ function App() {
                     value={`${result.summary.total_marketable_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
                   />
                   <StatTile
-                    label="Απώλεια από BER risk"
+                    label="Απώλεια από BER risk (υψηλό EC)"
                     value={`${(result.summary.ber_yield_loss_fraction * 100).toFixed(1)}%`}
+                  />
+                  <StatTile
+                    label="Απώλεια από έλλειψη θρεπτικών (χαμηλό EC)"
+                    value={`${(result.summary.ec_deficiency_yield_loss_fraction * 100).toFixed(1)}%`}
+                  />
+                  <StatTile
+                    label="Διαθεσιμότητα θρεπτικών (pH)"
+                    value={`${(result.summary.ph_availability_multiplier * 100).toFixed(1)}%`}
                   />
                   <StatTile
                     label="Recipe adequacy (N/K/Mg/B)"
