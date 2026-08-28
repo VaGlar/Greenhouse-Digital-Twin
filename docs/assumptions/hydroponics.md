@@ -220,6 +220,32 @@ needing to be told by inspecting output numbers. The recipe tab also gained a pe
 yield chart (reusing the existing `daily_series.marketable_yield_kg_m2` column above) once a
 simulation has run, in the same chart style as the rest of the app.
 
+### Open naming/architecture question: "marketable_yield_kg_m2" isn't strictly what it says (flagged 2026-08-29, not yet resolved)
+
+"Marketable yield" is a real agronomic term: output that passes quality control (size,
+appearance, no disorders) and can actually be sold, as distinct from total biological yield.
+Questioned by the user, and on inspection the term is only strictly accurate for **one** of the
+four factors combined into `marketable_yield_kg_m2`:
+
+- **B2 (BER, `ber_yield_loss_fraction`)** — genuinely a quality-control cut. BER is a real,
+  visible fruit defect (calcium disorder); the fruit grows to size but gets rejected. This *is*
+  a marketable-vs-total split.
+- **B1 (EC → dry matter), B3 (pH availability), the damped N/K/Mg/B tier** — these are **not**
+  rejection/culling. They model the plant producing *less total biomass* (denser fruit at high
+  EC, slower growth from nutrient stress) — a change to the total biological yield itself, not a
+  quality-control decision applied after the fact.
+
+So the current single `marketable_yield_kg_m2` number conflates two genuinely different concepts
+under one name: total-biological-yield effects and a true quality-rejection effect. A more
+accurate architecture, discussed but **explicitly deferred by the user** (2026-08-29, "το
+αφήνουμε ως έχει προς το παρόν"): a two-tier split, `yield_kg_m2` = final_yield_kg_m2 adjusted by
+B1 + B3 + the damped tier only (total biological output), and `marketable_yield_kg_m2` =
+`yield_kg_m2 * (1 - ber_yield_loss_fraction)` (the one real post-quality-control cut). Left
+undone for now — **revisit the quality-control framing before treating
+`marketable_yield_kg_m2` as an economically meaningful "sellable" figure** (e.g. before using it
+in any future revenue/pricing calculation). No code changed as part of this note; see the
+matching comment in `api/main.py` above the `marketable_yield_kg_m2` computation.
+
 ### Recipe "damped" tier: N, K, Mg, B — real mechanism, deliberately small/capped magnitude
 
 Explicit user framing (2026-08-26): unlike Level B above (which should be as rigorously
