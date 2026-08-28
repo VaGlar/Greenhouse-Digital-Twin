@@ -127,6 +127,10 @@ export interface SimulationResult {
     /** Hydroponics Level B2: fraction of ec_adjusted_final_yield_kg_m2 lost to BER
      * (Blossom End Rot) risk once EC exceeds the salinity threshold; 0 below it. */
     ber_yield_loss_fraction: number;
+    /** Hydroponics Level B, low-EC side: fraction lost to nutrient deficiency once EC drops
+     * below the deficiency threshold; 0 above it. Together with ber_yield_loss_fraction this
+     * makes the EC/yield response bell-shaped, not monotonic. */
+    ec_deficiency_yield_loss_fraction: number;
     /** Damped recipe tier (N/K/Mg/B): combined multiplicative yield effect, 1.0 when all four
      * are within their sufficiency range, floored so the tier can't swing yield too far. */
     recipe_adequacy_multiplier: number;

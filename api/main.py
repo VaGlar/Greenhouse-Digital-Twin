@@ -286,14 +286,21 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
         params.chp.co2_available_kg_per_hour / CO2_DENSITY_KG_M3 / params.geometry.volume_m3 * 1e6
     )
     # Hydroponic Level B (see docs/assumptions/hydroponics.md "Level B"): EC -> fruit dry-matter
-    # (B1) and EC/salinity -> BER risk (B2), plus the damped N/K/Mg/B recipe tier -- all applied
-    # as post-hoc scalar adjustments to final_yield_kg_m2, not inside the crop model's hourly
-    # loop (EC/recipe are static config values for the whole run in this design).
+    # (B1), plus the real bell-shaped EC/yield response -- BER risk above the high threshold and
+    # nutrient deficiency below the low threshold -- plus the damped N/K/Mg/B recipe tier. All
+    # applied as post-hoc scalar adjustments to final_yield_kg_m2, not inside the crop model's
+    # hourly loop (EC/recipe are static config values for the whole run in this design).
     hydro = params.hydroponic
     ec_adjusted_final_yield_kg_m2 = final_yield_kg_m2 / hydro.effective_dry_matter_content_fruit
     ber_yield_loss_fraction = hydro.ber_yield_loss_fraction
+    ec_deficiency_yield_loss_fraction = hydro.ec_deficiency_yield_loss_fraction
     recipe_adequacy_multiplier = hydro.recipe_adequacy_multiplier
-    marketable_yield_kg_m2 = ec_adjusted_final_yield_kg_m2 * (1.0 - ber_yield_loss_fraction) * recipe_adequacy_multiplier
+    marketable_yield_kg_m2 = (
+        ec_adjusted_final_yield_kg_m2
+        * (1.0 - ber_yield_loss_fraction)
+        * (1.0 - ec_deficiency_yield_loss_fraction)
+        * recipe_adequacy_multiplier
+    )
     total_marketable_yield_kg = marketable_yield_kg_m2 * params.geometry.area_m2
 
     return {
@@ -303,6 +310,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "total_yield_kg": final_yield_kg_m2 * params.geometry.area_m2,
             "ec_adjusted_final_yield_kg_m2": ec_adjusted_final_yield_kg_m2,
             "ber_yield_loss_fraction": ber_yield_loss_fraction,
+            "ec_deficiency_yield_loss_fraction": ec_deficiency_yield_loss_fraction,
             "recipe_adequacy_multiplier": recipe_adequacy_multiplier,
             "marketable_yield_kg_m2": marketable_yield_kg_m2,
             "total_marketable_yield_kg": total_marketable_yield_kg,

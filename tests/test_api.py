@@ -81,6 +81,7 @@ def test_simulate_response_has_expected_summary_fields():
         "max_co2_available_ppm",
         "ec_adjusted_final_yield_kg_m2",
         "ber_yield_loss_fraction",
+        "ec_deficiency_yield_loss_fraction",
         "recipe_adequacy_multiplier",
         "marketable_yield_kg_m2",
         "total_marketable_yield_kg",
@@ -268,6 +269,20 @@ def test_ec_target_override_above_ber_threshold_produces_yield_loss():
     high_ec = client.post("/simulate", json={"duration_days": 60, "ec_target_ms_cm": 4.5}).json()["summary"]
     assert high_ec["ber_yield_loss_fraction"] > 0.0
     assert high_ec["marketable_yield_kg_m2"] < baseline["marketable_yield_kg_m2"]
+
+
+def test_ec_yield_response_is_bell_shaped_not_monotonic():
+    # Real tomato EC/yield response peaks around the commonly-cited target range and falls off on
+    # BOTH sides (BER risk above, nutrient deficiency below) -- lowering EC should not just keep
+    # increasing marketable yield indefinitely.
+    low_ec = client.post("/simulate", json={"duration_days": 60, "ec_target_ms_cm": 1.0}).json()["summary"]
+    mid_ec = client.post("/simulate", json={"duration_days": 60, "ec_target_ms_cm": 3.0}).json()["summary"]
+    high_ec = client.post("/simulate", json={"duration_days": 60, "ec_target_ms_cm": 5.0}).json()["summary"]
+
+    assert low_ec["ec_deficiency_yield_loss_fraction"] > 0.0
+    assert high_ec["ber_yield_loss_fraction"] > 0.0
+    assert mid_ec["marketable_yield_kg_m2"] > low_ec["marketable_yield_kg_m2"]
+    assert mid_ec["marketable_yield_kg_m2"] > high_ec["marketable_yield_kg_m2"]
 
 
 def test_nutrient_ppm_override_out_of_range_reduces_recipe_adequacy():

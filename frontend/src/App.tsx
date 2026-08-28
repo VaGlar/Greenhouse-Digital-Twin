@@ -133,7 +133,7 @@ const RECIPE_SLIDERS: SliderDef[] = [
     max: 6.0,
     step: 0.1,
     optimal: [2.0, 3.5],
-    note: "2.0-3.5 mS/cm εμπορικό στάνταρ. Πάνω από 3.5 (BER threshold) αυξάνεται ο κίνδυνος Blossom End Rot· η ξηρή ουσία καρπού (και άρα το μειωμένο νωπό βάρος) αυξάνει γραμμικά με το EC σε όλο το εύρος.",
+    note: "Καμπανοειδής επίδραση στο yield, όχι γραμμική: 2.0-3.5 mS/cm εμπορικό στάνταρ/peak yield. Κάτω από 2.0 αυξάνεται ο κίνδυνος έλλειψης θρεπτικών (μειωμένη ανάπτυξη)· πάνω από 3.5 αυξάνεται ο κίνδυνος BER (Blossom End Rot) από αλατότητα. Η ξηρή ουσία καρπού αυξάνει ελαφρώς και γραμμικά με το EC σε όλο το εύρος (μικρή επίδραση).",
   },
   {
     key: "n_ppm",
@@ -803,8 +803,12 @@ function App() {
                     value={`${result.summary.total_marketable_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
                   />
                   <StatTile
-                    label="Απώλεια από BER risk"
+                    label="Απώλεια από BER risk (υψηλό EC)"
                     value={`${(result.summary.ber_yield_loss_fraction * 100).toFixed(1)}%`}
+                  />
+                  <StatTile
+                    label="Απώλεια από έλλειψη θρεπτικών (χαμηλό EC)"
+                    value={`${(result.summary.ec_deficiency_yield_loss_fraction * 100).toFixed(1)}%`}
                   />
                   <StatTile
                     label="Recipe adequacy (N/K/Mg/B)"

@@ -119,12 +119,47 @@ suggested default: a linear ramp reaching ~20% loss by threshold+2 mS/cm), cappe
 `ec_target_ms_cm = 3.0` (below the 3.5 threshold), loss is exactly 0 — doesn't disturb the current
 default-config run.
 
+**B2b. Low-EC side: nutrient deficiency → yield loss (added 2026-08-28, user-caught gap).** B1 and
+B2 above are both monotonic in EC and only penalize *high* EC — the first implementation of this
+section let marketable yield keep rising indefinitely as EC dropped toward zero, which the user
+flagged as unrealistic ("όσο χαμηλότερο είναι τόσο ανεβάζει το yield· θα έπρεπε να είναι καμπάνα,
+όχι γραμμικό"). Real hydroponic tomato trials confirm this: EC/yield is bell-shaped, not
+monotonic — one study found peak yield at EC 3 dS/m (rising from 0 up to that point, falling off
+above it), a range of ~2.0-3.0 dS/m is repeatedly cited elsewhere as the point below which yield
+drops off from under-fertilization, and industry guides describe low EC as causing nutrient
+starvation ("stunted growth and poor fruit quality"). Sources: search results summarizing
+[ResearchGate — The Effect of EC Levels of Nutrient Solution on the Growth, Yield, and Quality of
+Tomatoes under the Hydroponic System](https://www.researchgate.net/publication/261215803) (full
+PDF blocked by this session's egress proxy — sourced via the search engine's result summary only,
+same caveat as the Mg/photosynthesis source in the damped tier below) and general hydroponic-tomato
+grower guidance found via web search 2026-08-28 (query: "low EC nutrient solution tomato yield
+reduction deficiency hydroponic dilute below optimal").
+
+**Implemented**: `ec_deficiency_threshold_ms_cm = 2.0` (SOURCED — the low end of the commonly-cited
+2.0-3.5 mS/cm target range already used elsewhere in this file, and consistent with the cited
+study's yield-rising-up-to-EC-3 finding), `ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold
+= 0.15` and `ec_deficiency_yield_loss_fraction_max = 0.50` (both PLACEHOLDER — steeper slope and
+higher cap than B2's BER mechanism, since a fully nutrient-starved solution constrains the plant's
+*total* growth directly, a more severe constraint than BER's fruit-specific quality effect).
+Formula (`HydroponicParams.ec_deficiency_yield_loss_fraction`): `clamp(0, max_loss, slope *
+max(0, ec_deficiency_threshold_ms_cm - ec_target_ms_cm))` — the mirror image of B2's formula.
+Applied as a third multiplicative factor in `marketable_yield_kg_m2` alongside B1 and B2. At the
+default `ec_target_ms_cm = 3.0` (above the 2.0 threshold), loss is exactly 0. Together with B2,
+this makes the full EC/yield response in this model a plateau-with-shoulders shape: flat across
+the [2.0, 3.5] commercial target range (only B1's small quality-driven drift applies there), falling
+off on both sides beyond it — a real bell shape, not the monotonic-in-EC curve from the initial
+implementation.
+
 New summary outputs (`api/main.py` `/simulate`): `ec_adjusted_final_yield_kg_m2` (after B1),
-`ber_yield_loss_fraction`, `recipe_adequacy_multiplier` (see damped tier below),
-`marketable_yield_kg_m2` (after B1, B2, and the damped tier combined), `total_marketable_yield_kg`.
-The existing `daily_series.fruit_fresh_yield_kg_m2` chart stays as the base biomass-model curve,
-unadjusted — only the summary-level scalars carry the EC/BER/recipe adjustment, keeping the
-footprint small. Surfaced in the frontend's "Συνταγή γεωπονίας" tab results panel.
+`ber_yield_loss_fraction`, `ec_deficiency_yield_loss_fraction`, `recipe_adequacy_multiplier` (see
+damped tier below), `marketable_yield_kg_m2` (after B1, B2, B2b, and the damped tier combined),
+`total_marketable_yield_kg`. The existing `daily_series.fruit_fresh_yield_kg_m2` chart stays as the
+base biomass-model curve, unadjusted — only the summary-level scalars carry the EC/BER/deficiency/
+recipe adjustment, keeping the footprint small. Surfaced in the frontend's "Συνταγή γεωπονίας" tab,
+where `ec_target_ms_cm`, `n_ppm`, `k_ppm`, `mg_ppm`, `b_ppm` are also exposed as interactive sliders
+(the only recipe fields with a real modeled effect — pH and the informational tier are display-only,
+not sliders, since a slider would imply a model effect they don't have) via new `/simulate`
+overrides, so a user can see marketable yield respond directly.
 
 ### Recipe "damped" tier: N, K, Mg, B — real mechanism, deliberately small/capped magnitude
 

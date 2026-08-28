@@ -346,6 +346,21 @@ class HydroponicParams:
     # PLACEHOLDER: cap on B2's yield-loss fraction regardless of how far EC exceeds the threshold.
     ber_yield_loss_fraction_max: float = 0.35
 
+    # -- Level B, low-EC side: nutrient deficiency -> yield loss (real tomato EC/yield response is
+    # bell-shaped, not monotonic -- B1/B2 above only penalize high EC. A too-dilute solution starves
+    # the plant of nutrients, reducing total growth/fruit set, not just fruit concentration (a
+    # different mechanism from B1's dry-matter/quality effect). SOURCED threshold/direction: real
+    # trials found peak tomato yield around EC 3 dS/m, with yield falling off on *both* sides
+    # (e.g. one study found the highest yield at 3 dS/m, rising from 0, falling above it); matches
+    # the commonly-cited 2.0-3.5 mS/cm target range's own low end (see Level A above). See
+    # docs/assumptions/hydroponics.md.
+    ec_deficiency_threshold_ms_cm: float = 2.0
+    # PLACEHOLDER slope: steeper than the BER slope above -- a fully nutrient-starved solution
+    # (EC -> 0) constrains total plant growth directly, a more severe constraint than BER's
+    # fruit-specific quality effect, so it is allowed a higher slope and cap.
+    ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold: float = 0.15
+    ec_deficiency_yield_loss_fraction_max: float = 0.50
+
     # -- Recipe "damped" tier: N, K, Mg, B -- real mechanism, deliberately small/capped magnitude.
     # Each nutrient's `_ppm` is the recipe's actual target concentration; `_min_optimal_ppm` /
     # `_max_optimal_ppm` is the sufficiency range within which it costs nothing. Ranges are
@@ -403,6 +418,12 @@ class HydroponicParams:
             raise ValueError("ber_yield_loss_fraction_per_ms_cm_above_threshold must be >= 0")
         if not 0 < self.ber_yield_loss_fraction_max <= 1:
             raise ValueError("ber_yield_loss_fraction_max must be in (0, 1]")
+        if self.ec_deficiency_threshold_ms_cm <= 0:
+            raise ValueError("ec_deficiency_threshold_ms_cm must be > 0")
+        if self.ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold < 0:
+            raise ValueError("ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold must be >= 0")
+        if not 0 < self.ec_deficiency_yield_loss_fraction_max <= 1:
+            raise ValueError("ec_deficiency_yield_loss_fraction_max must be in (0, 1]")
         for label, lo, hi in (
             ("n", self.n_min_optimal_ppm, self.n_max_optimal_ppm),
             ("k", self.k_min_optimal_ppm, self.k_max_optimal_ppm),
@@ -434,6 +455,18 @@ class HydroponicParams:
         """Level B2: EC/salinity-driven BER (Blossom End Rot) marketable-yield loss fraction."""
         excess = max(0.0, self.ec_target_ms_cm - self.ec_ber_threshold_ms_cm)
         return min(self.ber_yield_loss_fraction_max, self.ber_yield_loss_fraction_per_ms_cm_above_threshold * excess)
+
+    @property
+    def ec_deficiency_yield_loss_fraction(self) -> float:
+        """Level B, low-EC side: nutrient-deficiency yield loss fraction below
+        `ec_deficiency_threshold_ms_cm` -- the low-EC half of the real, bell-shaped tomato
+        EC/yield response (B2 above only covers the high-EC/BER half).
+        """
+        deficit = max(0.0, self.ec_deficiency_threshold_ms_cm - self.ec_target_ms_cm)
+        return min(
+            self.ec_deficiency_yield_loss_fraction_max,
+            self.ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold * deficit,
+        )
 
     def _nutrient_penalty(self, value: float, min_optimal: float, max_optimal: float) -> float:
         """Damped recipe tier: 0 inside [min_optimal, max_optimal], ramping linearly to

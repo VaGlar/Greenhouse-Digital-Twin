@@ -118,6 +118,31 @@ def test_ber_yield_loss_fraction_ramps_above_threshold_and_is_capped():
     assert capped.ber_yield_loss_fraction == 0.35
 
 
+def test_ec_deficiency_yield_loss_fraction_is_zero_above_threshold():
+    params = HydroponicParams(ec_target_ms_cm=3.0, ec_deficiency_threshold_ms_cm=2.0)
+    assert params.ec_deficiency_yield_loss_fraction == 0.0
+
+
+def test_ec_deficiency_yield_loss_fraction_ramps_below_threshold_and_is_capped():
+    params = HydroponicParams(
+        ec_target_ms_cm=1.0,
+        ec_deficiency_threshold_ms_cm=2.0,
+        ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold=0.15,
+        ec_deficiency_yield_loss_fraction_max=0.50,
+    )
+    assert params.ec_deficiency_yield_loss_fraction == pytest.approx(0.15)
+
+    # ec_target_ms_cm must be > 0, so a very high slope (rather than a very low EC) is used to
+    # reach the cap within a valid EC value.
+    capped = HydroponicParams(
+        ec_target_ms_cm=0.01,
+        ec_deficiency_threshold_ms_cm=2.0,
+        ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold=10.0,
+        ec_deficiency_yield_loss_fraction_max=0.50,
+    )
+    assert capped.ec_deficiency_yield_loss_fraction == 0.50
+
+
 def test_recipe_adequacy_multiplier_is_one_when_all_nutrients_in_range():
     params = HydroponicParams(n_ppm=105.0, k_ppm=300.0, mg_ppm=65.0, b_ppm=0.40)
     assert params.recipe_adequacy_multiplier == pytest.approx(1.0)
