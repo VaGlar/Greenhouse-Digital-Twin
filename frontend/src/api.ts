@@ -178,6 +178,11 @@ export interface SimulationOverrides {
   heating_setpoint_night_c?: number;
   co2_setpoint_day_ppm?: number;
   dehumidification_setpoint_pct?: number;
+  ec_target_ms_cm?: number;
+  n_ppm?: number;
+  k_ppm?: number;
+  mg_ppm?: number;
+  b_ppm?: number;
 }
 
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
