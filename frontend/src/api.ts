@@ -39,8 +39,6 @@ export interface GreenhouseConfig {
     substrate_type: string;
     ec_target_ms_cm: number;
     ph_target: number;
-    ph_min_optimal: number;
-    ph_max_optimal: number;
     drainage_target_fraction: number;
     /** Damped recipe tier (hydroponics.md "Level B"): actual recipe ppm + sufficiency range. */
     n_ppm: number;
