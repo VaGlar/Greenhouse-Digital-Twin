@@ -109,8 +109,9 @@ class SimulateRequest(BaseModel):
     dehumidification_setpoint_pct: float | None = None
     # Hydroponics recipe (see docs/assumptions/hydroponics.md "Level B" + damped recipe tier) --
     # the only recipe fields with a real modeled effect, so the only ones exposed as overrides.
-    # pH and the informational tier (P/S/Fe/Mn/Zn/Cu/Mo) have no model effect, so aren't here.
+    # The informational tier (P/S/Fe/Mn/Zn/Cu/Mo) has no model effect, so isn't here.
     ec_target_ms_cm: float | None = None
+    ph_target: float | None = None
     n_ppm: float | None = None
     k_ppm: float | None = None
     mg_ppm: float | None = None
@@ -139,6 +140,8 @@ def _apply_overrides(raw: dict, overrides: SimulateRequest) -> dict:
     hydro = raw.setdefault("hydroponic", {})
     if overrides.ec_target_ms_cm is not None:
         hydro["ec_target_ms_cm"] = overrides.ec_target_ms_cm
+    if overrides.ph_target is not None:
+        hydro["ph_target"] = overrides.ph_target
     if overrides.n_ppm is not None:
         hydro["n_ppm"] = overrides.n_ppm
     if overrides.k_ppm is not None:
@@ -286,19 +289,22 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
         params.chp.co2_available_kg_per_hour / CO2_DENSITY_KG_M3 / params.geometry.volume_m3 * 1e6
     )
     # Hydroponic Level B (see docs/assumptions/hydroponics.md "Level B"): EC -> fruit dry-matter
-    # (B1), plus the real bell-shaped EC/yield response -- BER risk above the high threshold and
-    # nutrient deficiency below the low threshold -- plus the damped N/K/Mg/B recipe tier. All
-    # applied as post-hoc scalar adjustments to final_yield_kg_m2, not inside the crop model's
-    # hourly loop (EC/recipe are static config values for the whole run in this design).
+    # (B1), the real bell-shaped EC/yield response (BER risk above the high threshold, nutrient
+    # deficiency below the low threshold), pH -> nutrient-availability yield loss, plus the
+    # damped N/K/Mg/B recipe tier. All applied as post-hoc scalar adjustments to
+    # final_yield_kg_m2, not inside the crop model's hourly loop (EC/pH/recipe are static config
+    # values for the whole run in this design).
     hydro = params.hydroponic
     ec_adjusted_final_yield_kg_m2 = final_yield_kg_m2 / hydro.effective_dry_matter_content_fruit
     ber_yield_loss_fraction = hydro.ber_yield_loss_fraction
     ec_deficiency_yield_loss_fraction = hydro.ec_deficiency_yield_loss_fraction
+    ph_availability_multiplier = hydro.ph_availability_multiplier
     recipe_adequacy_multiplier = hydro.recipe_adequacy_multiplier
     marketable_yield_kg_m2 = (
         ec_adjusted_final_yield_kg_m2
         * (1.0 - ber_yield_loss_fraction)
         * (1.0 - ec_deficiency_yield_loss_fraction)
+        * ph_availability_multiplier
         * recipe_adequacy_multiplier
     )
     total_marketable_yield_kg = marketable_yield_kg_m2 * params.geometry.area_m2
@@ -311,6 +317,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
             "ec_adjusted_final_yield_kg_m2": ec_adjusted_final_yield_kg_m2,
             "ber_yield_loss_fraction": ber_yield_loss_fraction,
             "ec_deficiency_yield_loss_fraction": ec_deficiency_yield_loss_fraction,
+            "ph_availability_multiplier": ph_availability_multiplier,
             "recipe_adequacy_multiplier": recipe_adequacy_multiplier,
             "marketable_yield_kg_m2": marketable_yield_kg_m2,
             "total_marketable_yield_kg": total_marketable_yield_kg,

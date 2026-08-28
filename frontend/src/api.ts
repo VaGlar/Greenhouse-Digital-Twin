@@ -39,6 +39,8 @@ export interface GreenhouseConfig {
     substrate_type: string;
     ec_target_ms_cm: number;
     ph_target: number;
+    ph_min_optimal: number;
+    ph_max_optimal: number;
     drainage_target_fraction: number;
     /** Damped recipe tier (hydroponics.md "Level B"): actual recipe ppm + sufficiency range. */
     n_ppm: number;
@@ -131,6 +133,9 @@ export interface SimulationResult {
      * below the deficiency threshold; 0 above it. Together with ber_yield_loss_fraction this
      * makes the EC/yield response bell-shaped, not monotonic. */
     ec_deficiency_yield_loss_fraction: number;
+    /** Hydroponics Level B: pH-driven nutrient-availability yield multiplier, 1.0 when pH is
+     * within its sufficiency range, dropping outside it (gates all nutrients at once). */
+    ph_availability_multiplier: number;
     /** Damped recipe tier (N/K/Mg/B): combined multiplicative yield effect, 1.0 when all four
      * are within their sufficiency range, floored so the tier can't swing yield too far. */
     recipe_adequacy_multiplier: number;
@@ -183,6 +188,7 @@ export interface SimulationOverrides {
   co2_setpoint_day_ppm?: number;
   dehumidification_setpoint_pct?: number;
   ec_target_ms_cm?: number;
+  ph_target?: number;
   n_ppm?: number;
   k_ppm?: number;
   mg_ppm?: number;

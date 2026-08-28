@@ -119,6 +119,13 @@ hydroponic:
   ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold: 0.15
   ec_deficiency_yield_loss_fraction_max: 0.50
 
+  # pH -> nutrient availability -> yield loss. SOURCED range (same as ph_target's own comment
+  # above); PLACEHOLDER cap, higher than any single damped-tier nutrient since pH gates
+  # availability of all of them at once.
+  ph_min_optimal: 5.5
+  ph_max_optimal: 6.5
+  ph_availability_penalty_cap_fraction: 0.15
+
   # Recipe "damped" tier: N/K/Mg/B -- real mechanism, deliberately capped magnitude. Ranges
   # SOURCED (CEAC Arizona / Florida IFAS tomato formulas); penalty cap PLACEHOLDER.
   n_ppm: 105.0

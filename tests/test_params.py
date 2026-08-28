@@ -143,6 +143,24 @@ def test_ec_deficiency_yield_loss_fraction_ramps_below_threshold_and_is_capped()
     assert capped.ec_deficiency_yield_loss_fraction == 0.50
 
 
+def test_ph_availability_multiplier_is_one_when_ph_in_range():
+    params = HydroponicParams(ph_target=6.0, ph_min_optimal=5.5, ph_max_optimal=6.5)
+    assert params.ph_availability_multiplier == pytest.approx(1.0)
+
+
+def test_ph_availability_multiplier_drops_when_ph_out_of_range():
+    in_range = HydroponicParams(ph_target=6.0)
+    out_of_range = HydroponicParams(ph_target=8.0)  # well above ph_max_optimal=6.5
+    assert out_of_range.ph_availability_multiplier < in_range.ph_availability_multiplier
+
+
+def test_ph_availability_multiplier_uses_its_own_higher_cap_than_a_single_nutrient():
+    # A pH excursion large enough to hit its individual cap should lose more than any single
+    # damped-tier nutrient's cap (ph_availability_penalty_cap_fraction=0.15 vs. 0.02 default).
+    far_out = HydroponicParams(ph_target=10.0, ph_min_optimal=5.5, ph_max_optimal=6.5)
+    assert far_out.ph_availability_multiplier == pytest.approx(1.0 - 0.15)
+
+
 def test_recipe_adequacy_multiplier_is_one_when_all_nutrients_in_range():
     params = HydroponicParams(n_ppm=105.0, k_ppm=300.0, mg_ppm=65.0, b_ppm=0.40)
     assert params.recipe_adequacy_multiplier == pytest.approx(1.0)

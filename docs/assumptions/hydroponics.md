@@ -1,9 +1,10 @@
 # Hydroponics assumptions
 
 `config/greenhouse_example.yaml` → `hydroponic:` block (`twin/params.py`'s `HydroponicParams`).
-Implemented in three planned levels (agreed with the user 2026-08-26) — Level A and Level B (plus
-the damped N/K/Mg/B tier and the informational P/S/Fe/Mn/Zn/Cu/Mo tier) are all implemented as of
-2026-08-28. Level D (ML recalibration) remains a future idea only, not started.
+Implemented in three planned levels (agreed with the user 2026-08-26) — Level A and Level B
+(EC → dry matter/BER/deficiency, pH → nutrient availability, plus the damped N/K/Mg/B tier and the
+informational P/S/Fe/Mn/Zn/Cu/Mo tier) are all implemented as of 2026-08-29. Level D (ML
+recalibration) remains a future idea only, not started.
 
 ## System-type correction (2026-08-26)
 
@@ -26,7 +27,7 @@ Unlike those three, this one also tracks water and fertilizer mass, not just ele
 | Parameter | Value | Tag | Notes |
 |---|---|---|---|
 | `ec_target_ms_cm` | 3.0 | **SOURCED** | 2.0-3.5 mS/cm is the commonly cited target range for greenhouse tomato nutrient solution. Was already shown (2.5-3.5) as a purely informational reference value in the frontend's "Συνταγή γεωπονίας" tab before this work — now a real `HydroponicParams` field the physics actually reads. Source: `docs/papers/hydroponic-fertigation-level-a.md`. |
-| `ph_target` | 6.0 | **SOURCED** | 5.5-6.5 is the standard nutrient-availability optimum (outside this range, specific nutrients become chemically unavailable to the plant even if present in solution). Not yet wired into any model behavior — pH's effect is much more a hard availability threshold than a continuous dial, and no PH-driven yield/quality mechanism has been added (candidate for Level B/C). Source: same as above. |
+| `ph_target` | 6.0 | **SOURCED** | 5.5-6.5 is the standard nutrient-availability optimum (outside this range, specific nutrients become chemically unavailable to the plant even if present in solution). Wired into the model as of 2026-08-29 (see "Level B: pH" below) — the row above described it as unimplemented, that's now out of date. Source: same as above. |
 | `drainage_target_fraction` | 0.25 | **SOURCED** | 20-30% leaching fraction is standard substrate-culture practice — irrigating somewhat beyond what the plant will actually use, so the excess flushes accumulated salts out of the root zone rather than letting them concentrate over time. Source: same as above. |
 | `irrigation_pump_specific_power_kwh_per_m3` | 0.28 | **SOURCED (general average, not this specific pump)** | A global study on irrigation energy footprints finds drip irrigation averages ~1.0 MJ/m³ (≈0.28 kWh/m³), noticeably lower than sprinkler (1.8 MJ/m³) thanks to drip's lower operating pressure. This is a general drip-irrigation figure across agriculture broadly (includes water sourcing/conveyance in some of the underlying data), not a spec for this greenhouse's actual Spagnol BravoJet pump — flagged as an approximation, not a real product spec. Source: `docs/papers/hydroponic-fertigation-level-a.md`. |
 | `fertilizer_g_per_l_per_ec_unit` | 0.64 | **PLACEHOLDER** | Generic EC-to-TDS conversion factor (EC in mS/cm × ~640 ≈ TDS in ppm/mg per liter, using the commonly-cited "0.64 scale" — other conventions use 0.5 or 0.7). This converts EC into an approximate fertilizer *mass* dosed, but real dosing depends on the specific fertilizer blend's composition, which isn't available for the real BravoJet system's actual fertilizer choice. Treat `total_fertilizer_dosed_kg` as an order-of-magnitude estimate, not a real quote-able mass. |
@@ -150,16 +151,44 @@ the [2.0, 3.5] commercial target range (only B1's small quality-driven drift app
 off on both sides beyond it — a real bell shape, not the monotonic-in-EC curve from the initial
 implementation.
 
+### B3: pH → nutrient availability → marketable yield loss (added 2026-08-29)
+
+`ph_target` was SOURCED to the same 5.5-6.5 nutrient-availability range documented in Level A
+above, but explicitly left unimplemented ("pH's effect is much more a hard availability threshold
+than a continuous dial"). Implemented once the N/K/Mg/B damped tier's sufficiency-range pattern
+existed to reuse: outside [5.5, 6.5], specific nutrients become chemically unavailable to the
+plant even if physically present in solution — a real, well-documented soilless-culture mechanism
+(the classic nutrient-availability-vs-pH chart). A trial testing pH 4.5/5.0/5.5/6.0/6.5 found the
+highest tomato yield at pH 5.5, inside this range, consistent with the sourced band. Source:
+search results summarizing "The Influence of pH of Nutrient Solution On Yield and Nutritional
+Status of Tomato Plants Grown in Soilless Culture System" (ResearchGate, full text not accessed —
+blocked by this session's egress proxy, same caveat as the EC-deficiency source above), found via
+web search 2026-08-29 (query: "hydroponic tomato pH nutrient availability yield reduction outside
+optimal range 5.5-6.5 quantified percentage").
+
+**Implemented** (`HydroponicParams`): `ph_min_optimal = 5.5`, `ph_max_optimal = 6.5` (SOURCED,
+same range as `ph_target`'s own sourcing), `ph_availability_penalty_cap_fraction = 0.15`
+(PLACEHOLDER magnitude — no quantified tomato-specific percentage was found for pH excursions).
+Reuses the exact same sufficiency-range-penalty shape as the damped N/K/Mg/B tier below (the
+`_nutrient_penalty` method was generalized to take an optional `cap_fraction` override so both
+share one implementation) — but with its own higher cap (0.15 vs. the damped tier's 0.02 per
+nutrient), since pH gates the availability of *every* nutrient simultaneously, not one specific
+concentration. Reported as `ph_availability_multiplier` (`HydroponicParams.ph_availability_multiplier`,
+a property distinct from `recipe_adequacy_multiplier` since it's a different mechanism), applied
+as a fourth multiplicative factor in `marketable_yield_kg_m2` alongside B1/B2/B2b. At the default
+`ph_target = 6.0` (inside the range), the multiplier is exactly 1.0.
+
 New summary outputs (`api/main.py` `/simulate`): `ec_adjusted_final_yield_kg_m2` (after B1),
-`ber_yield_loss_fraction`, `ec_deficiency_yield_loss_fraction`, `recipe_adequacy_multiplier` (see
-damped tier below), `marketable_yield_kg_m2` (after B1, B2, B2b, and the damped tier combined),
-`total_marketable_yield_kg`. The existing `daily_series.fruit_fresh_yield_kg_m2` chart stays as the
-base biomass-model curve, unadjusted — only the summary-level scalars carry the EC/BER/deficiency/
-recipe adjustment, keeping the footprint small. Surfaced in the frontend's "Συνταγή γεωπονίας" tab,
-where `ec_target_ms_cm`, `n_ppm`, `k_ppm`, `mg_ppm`, `b_ppm` are also exposed as interactive sliders
-(the only recipe fields with a real modeled effect — pH and the informational tier are display-only,
-not sliders, since a slider would imply a model effect they don't have) via new `/simulate`
-overrides, so a user can see marketable yield respond directly.
+`ber_yield_loss_fraction`, `ec_deficiency_yield_loss_fraction`, `ph_availability_multiplier`,
+`recipe_adequacy_multiplier` (see damped tier below), `marketable_yield_kg_m2` (after B1, B2, B2b,
+B3, and the damped tier combined), `total_marketable_yield_kg`. The existing
+`daily_series.fruit_fresh_yield_kg_m2` chart stays as the base biomass-model curve, unadjusted —
+only the summary-level scalars carry the EC/pH/recipe adjustment, keeping the footprint small.
+Surfaced in the frontend's "Συνταγή γεωπονίας" tab, where `ec_target_ms_cm`, `ph_target`, `n_ppm`,
+`k_ppm`, `mg_ppm`, `b_ppm` are all exposed as interactive sliders (the only recipe fields with a
+real modeled effect — the informational tier stays display-only, since a slider would imply a
+model effect it doesn't have) via `/simulate` overrides, so a user can see marketable yield
+respond directly.
 
 ### Recipe "damped" tier: N, K, Mg, B — real mechanism, deliberately small/capped magnitude
 

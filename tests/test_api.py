@@ -82,6 +82,7 @@ def test_simulate_response_has_expected_summary_fields():
         "ec_adjusted_final_yield_kg_m2",
         "ber_yield_loss_fraction",
         "ec_deficiency_yield_loss_fraction",
+        "ph_availability_multiplier",
         "recipe_adequacy_multiplier",
         "marketable_yield_kg_m2",
         "total_marketable_yield_kg",
@@ -292,6 +293,19 @@ def test_nutrient_ppm_override_out_of_range_reduces_recipe_adequacy():
     low_n = client.post("/simulate", json={"duration_days": 60, "n_ppm": 5.0}).json()["summary"]
     assert low_n["recipe_adequacy_multiplier"] < 1.0
     assert low_n["marketable_yield_kg_m2"] < baseline["marketable_yield_kg_m2"]
+
+
+def test_ph_target_override_out_of_range_reduces_marketable_yield():
+    baseline = client.post("/simulate", json={"duration_days": 60}).json()["summary"]
+    assert baseline["ph_availability_multiplier"] == pytest.approx(1.0)
+
+    high_ph = client.post("/simulate", json={"duration_days": 60, "ph_target": 8.0}).json()["summary"]
+    assert high_ph["ph_availability_multiplier"] < 1.0
+    assert high_ph["marketable_yield_kg_m2"] < baseline["marketable_yield_kg_m2"]
+
+    low_ph = client.post("/simulate", json={"duration_days": 60, "ph_target": 4.5}).json()["summary"]
+    assert low_ph["ph_availability_multiplier"] < 1.0
+    assert low_ph["marketable_yield_kg_m2"] < baseline["marketable_yield_kg_m2"]
 
 
 def test_recirculation_electricity_is_bounded_by_its_fixed_fan_power():
