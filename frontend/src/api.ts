@@ -39,8 +39,6 @@ export interface GreenhouseConfig {
     substrate_type: string;
     ec_target_ms_cm: number;
     ph_target: number;
-    ph_min_optimal: number;
-    ph_max_optimal: number;
     drainage_target_fraction: number;
     /** Damped recipe tier (hydroponics.md "Level B"): actual recipe ppm + sufficiency range. */
     n_ppm: number;
@@ -91,6 +89,11 @@ export interface DailyPoint {
   rh_in_pct: number;
   vpd_kpa: number;
   fruit_fresh_yield_kg_m2: number;
+  /** Same cumulative curve as fruit_fresh_yield_kg_m2, scaled by the same constant EC/pH/recipe
+   * ratio the summary's marketable_yield_kg_m2 uses -- so any per-day "yield" display in the UI
+   * (schematic, sparklines) stays consistent with the summary card instead of showing the raw,
+   * unadjusted biomass curve next to an adjusted summary number. */
+  marketable_yield_kg_m2: number;
   /** Daily-average thermal power draw (kW), normalized per hour — not a daily total. */
   heat_used_kw: number;
   /** Hours that day the thermal screen was deployed (fully automatic — see backend). */
