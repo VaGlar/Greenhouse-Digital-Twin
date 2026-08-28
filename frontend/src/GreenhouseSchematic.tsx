@@ -83,7 +83,7 @@ export function GreenhouseSchematic({
       anchor: "start",
     },
     { x: 455, y: 52, label: "Στόχος RH (είσοδος)", value: `${dehumidSetpointPct.toFixed(0)}%`, anchor: "start" },
-    { x: 320, y: 250, label: "Yield μέχρι τώρα", value: fmt(yieldKgM2, 2, " kg/m²"), anchor: "middle" },
+    { x: 320, y: 250, label: "Marketable yield μέχρι τώρα", value: fmt(yieldKgM2, 2, " kg/m²"), anchor: "middle" },
   ];
 
   return (

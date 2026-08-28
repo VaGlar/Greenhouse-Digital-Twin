@@ -133,8 +133,8 @@ const RECIPE_SLIDERS: SliderDef[] = [
     min: 1.5,
     max: 6.0,
     step: 0.1,
-    optimal: [2.0, 3.5],
-    note: "Καμπανοειδής επίδραση στο yield, όχι γραμμική: 2.0-3.5 mS/cm εμπορικό στάνταρ/peak yield. Κάτω από 2.0 αυξάνεται ο κίνδυνος έλλειψης θρεπτικών (μειωμένη ανάπτυξη)· πάνω από 3.5 αυξάνεται ο κίνδυνος BER (Blossom End Rot) από αλατότητα. Η ξηρή ουσία καρπού αυξάνει ελαφρώς και γραμμικά με το EC σε όλο το εύρος (μικρή επίδραση).",
+    optimal: [2.5, 3.5],
+    note: "Καμπανοειδής επίδραση στο yield: peak στο 3.0 mS/cm, συνεχής πτώση και προς τις δύο κατευθύνσεις (όχι flat plateau). Χαμηλότερο EC → αυξάνει προοδευτικά ο κίνδυνος έλλειψης θρεπτικών· υψηλότερο EC → αυξάνει προοδευτικά ο κίνδυνος BER (Blossom End Rot) από αλατότητα. Η ξηρή ουσία καρπού αυξάνει επιπλέον ελαφρώς και γραμμικά με το EC σε όλο το εύρος.",
   },
   {
     key: "ph_target",
@@ -143,8 +143,8 @@ const RECIPE_SLIDERS: SliderDef[] = [
     min: 4.5,
     max: 8.0,
     step: 0.1,
-    optimal: [5.5, 6.5],
-    note: "Εκτός 5.5-6.5, συγκεκριμένα θρεπτικά γίνονται χημικά μη διαθέσιμα στο φυτό ακόμα κι αν υπάρχουν στο διάλυμα -- γκαρδάρει όλα τα θρεπτικά ταυτόχρονα, όχι μόνο ένα.",
+    optimal: [5.1, 5.9],
+    note: "Καμπανοειδής επίδραση: peak ακριβώς στο pH 5.5, συνεχής πτώση και προς τις δύο κατευθύνσεις (όχι flat plateau). Μακριά από το peak, όλο και περισσότερα θρεπτικά γίνονται χημικά μη διαθέσιμα στο φυτό ακόμα κι αν υπάρχουν στο διάλυμα -- γκαρδάρει όλα τα θρεπτικά ταυτόχρονα, όχι μόνο ένα.",
   },
   {
     key: "n_ppm",
@@ -441,8 +441,8 @@ function App() {
             {config.chp.electric_power_kw.toLocaleString()} kW CHP
             {result && (
               <>
-                {" "}&middot; ημέρα {result.summary.duration_days} &middot; yield{" "}
-                {result.summary.final_yield_kg_m2.toFixed(2)} kg/m²
+                {" "}&middot; ημέρα {result.summary.duration_days} &middot; marketable yield{" "}
+                {result.summary.marketable_yield_kg_m2.toFixed(2)} kg/m²
               </>
             )}
           </p>
@@ -522,8 +522,8 @@ function App() {
                 )}
                 {result && (
                   <div className="side-field">
-                    <span className="side-field-label">Σωρευτική παραγωγή μέχρι τώρα</span>
-                    <Sparkline data={result.daily_series} dataKey="fruit_fresh_yield_kg_m2" color="var(--series-4)" />
+                    <span className="side-field-label">Σωρευτική παραγωγή μέχρι τώρα (marketable)</span>
+                    <Sparkline data={result.daily_series} dataKey="marketable_yield_kg_m2" color="var(--series-4)" />
                   </div>
                 )}
               </>
@@ -768,16 +768,16 @@ function App() {
               screenSavingPct={config ? config.climate_control.screen_energy_saving_fraction * 100 : 55}
               screenDeployedPct={result?.summary.screen_deployed_pct ?? null}
               dehumidSetpointPct={sliderValues.dehumidification_setpoint_pct}
-              yieldKgM2={viewedDay?.fruit_fresh_yield_kg_m2 ?? null}
+              yieldKgM2={viewedDay?.marketable_yield_kg_m2 ?? null}
             />
           )}
 
           {showSchematic && activeTab === "chp" && result && (
             <section className="stat-row">
-              <StatTile label="Τελικό yield" value={`${result.summary.final_yield_kg_m2.toFixed(2)} kg/m²`} />
+              <StatTile label="Marketable yield" value={`${result.summary.marketable_yield_kg_m2.toFixed(2)} kg/m²`} />
               <StatTile
                 label="Συνολική παραγωγή"
-                value={`${result.summary.total_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
+                value={`${result.summary.total_marketable_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
               />
               <StatTile label="Διάρκεια" value={`${result.summary.duration_days} μέρες`} />
               <StatTile
@@ -835,10 +835,17 @@ function App() {
               {result ? (
                 <>
                   <section className="stat-row">
-                    <StatTile label="Τελικό yield" value={`${result.summary.final_yield_kg_m2.toFixed(2)} kg/m²`} />
+                    <StatTile
+                      label="Marketable yield"
+                      value={`${result.summary.marketable_yield_kg_m2.toFixed(2)} kg/m²`}
+                    />
                     <StatTile
                       label="Συνολική παραγωγή"
-                      value={`${result.summary.total_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
+                      value={`${result.summary.total_marketable_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
+                    />
+                    <StatTile
+                      label="Βιομάζα πριν EC/pH/θρεπτικά"
+                      value={`${result.summary.final_yield_kg_m2.toFixed(2)} kg/m²`}
                     />
                     <StatTile label="Μέσο Fruit Set" value={`${result.summary.avg_fruit_set_pct.toFixed(0)}%`} />
                     <StatTile

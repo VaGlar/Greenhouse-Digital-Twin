@@ -78,9 +78,9 @@ def test_hydroponic_params_rejects_inverted_nutrient_range():
         HydroponicParams(n_min_optimal_ppm=150.0, n_max_optimal_ppm=60.0)
 
 
-def test_hydroponic_params_rejects_negative_ber_slope():
-    with pytest.raises(ValueError, match="ber_yield_loss_fraction_per_ms_cm_above_threshold"):
-        HydroponicParams(ber_yield_loss_fraction_per_ms_cm_above_threshold=-0.1)
+def test_hydroponic_params_rejects_negative_ec_high_side_curvature():
+    with pytest.raises(ValueError, match="ec_high_side_curvature_per_ms_cm2"):
+        HydroponicParams(ec_high_side_curvature_per_ms_cm2=-0.1)
 
 
 def test_hydroponic_params_rejects_recipe_adequacy_multiplier_min_of_zero():
@@ -95,69 +95,85 @@ def test_effective_dry_matter_content_fruit_increases_with_ec():
     assert high.effective_dry_matter_content_fruit > low.effective_dry_matter_content_fruit
 
 
-def test_ber_yield_loss_fraction_is_zero_below_threshold():
-    params = HydroponicParams(ec_target_ms_cm=3.0, ec_ber_threshold_ms_cm=3.5)
-    assert params.ber_yield_loss_fraction == 0.0
+def test_ber_yield_loss_fraction_is_zero_at_and_below_optimal():
+    at_peak = HydroponicParams(ec_target_ms_cm=3.0, ec_optimal_ms_cm=3.0)
+    below_peak = HydroponicParams(ec_target_ms_cm=1.0, ec_optimal_ms_cm=3.0)
+    assert at_peak.ber_yield_loss_fraction == 0.0
+    assert below_peak.ber_yield_loss_fraction == 0.0
 
 
-def test_ber_yield_loss_fraction_ramps_above_threshold_and_is_capped():
+def test_ber_yield_loss_fraction_grows_continuously_above_optimal_and_is_capped():
     params = HydroponicParams(
         ec_target_ms_cm=4.5,
-        ec_ber_threshold_ms_cm=3.5,
-        ber_yield_loss_fraction_per_ms_cm_above_threshold=0.10,
+        ec_optimal_ms_cm=3.0,
+        ec_high_side_curvature_per_ms_cm2=0.0444,
         ber_yield_loss_fraction_max=0.35,
     )
-    assert params.ber_yield_loss_fraction == pytest.approx(0.10)
+    assert params.ber_yield_loss_fraction == pytest.approx(0.0444 * 1.5**2)
 
     capped = HydroponicParams(
-        ec_target_ms_cm=10.0,
-        ec_ber_threshold_ms_cm=3.5,
-        ber_yield_loss_fraction_per_ms_cm_above_threshold=0.10,
+        ec_target_ms_cm=20.0,
+        ec_optimal_ms_cm=3.0,
+        ec_high_side_curvature_per_ms_cm2=0.0444,
         ber_yield_loss_fraction_max=0.35,
     )
     assert capped.ber_yield_loss_fraction == 0.35
 
 
-def test_ec_deficiency_yield_loss_fraction_is_zero_above_threshold():
-    params = HydroponicParams(ec_target_ms_cm=3.0, ec_deficiency_threshold_ms_cm=2.0)
-    assert params.ec_deficiency_yield_loss_fraction == 0.0
+def test_ec_deficiency_yield_loss_fraction_is_zero_at_and_above_optimal():
+    at_peak = HydroponicParams(ec_target_ms_cm=3.0, ec_optimal_ms_cm=3.0)
+    above_peak = HydroponicParams(ec_target_ms_cm=5.0, ec_optimal_ms_cm=3.0)
+    assert at_peak.ec_deficiency_yield_loss_fraction == 0.0
+    assert above_peak.ec_deficiency_yield_loss_fraction == 0.0
 
 
-def test_ec_deficiency_yield_loss_fraction_ramps_below_threshold_and_is_capped():
+def test_ec_deficiency_yield_loss_fraction_grows_continuously_below_optimal_and_is_capped():
     params = HydroponicParams(
         ec_target_ms_cm=1.0,
-        ec_deficiency_threshold_ms_cm=2.0,
-        ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold=0.15,
+        ec_optimal_ms_cm=3.0,
+        ec_low_side_curvature_per_ms_cm2=0.0375,
         ec_deficiency_yield_loss_fraction_max=0.50,
     )
-    assert params.ec_deficiency_yield_loss_fraction == pytest.approx(0.15)
+    assert params.ec_deficiency_yield_loss_fraction == pytest.approx(0.0375 * 2.0**2)
 
-    # ec_target_ms_cm must be > 0, so a very high slope (rather than a very low EC) is used to
-    # reach the cap within a valid EC value.
     capped = HydroponicParams(
         ec_target_ms_cm=0.01,
-        ec_deficiency_threshold_ms_cm=2.0,
-        ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold=10.0,
+        ec_optimal_ms_cm=3.0,
+        ec_low_side_curvature_per_ms_cm2=10.0,
         ec_deficiency_yield_loss_fraction_max=0.50,
     )
     assert capped.ec_deficiency_yield_loss_fraction == 0.50
 
 
-def test_ph_availability_multiplier_is_one_when_ph_in_range():
-    params = HydroponicParams(ph_target=6.0, ph_min_optimal=5.5, ph_max_optimal=6.5)
-    assert params.ph_availability_multiplier == pytest.approx(1.0)
+def test_ec_yield_response_has_no_flat_zone_around_the_peak():
+    # The whole point of the continuous-bell redesign: two EC values on the same side of the
+    # peak, both inside the old "commercial target range", must still differ -- unlike the
+    # earlier flat-plateau version.
+    near_peak = HydroponicParams(ec_target_ms_cm=3.0)
+    slightly_off = HydroponicParams(ec_target_ms_cm=3.3)
+    assert slightly_off.ber_yield_loss_fraction > near_peak.ber_yield_loss_fraction
 
 
-def test_ph_availability_multiplier_drops_when_ph_out_of_range():
-    in_range = HydroponicParams(ph_target=6.0)
-    out_of_range = HydroponicParams(ph_target=8.0)  # well above ph_max_optimal=6.5
-    assert out_of_range.ph_availability_multiplier < in_range.ph_availability_multiplier
+def test_ph_availability_multiplier_is_one_only_exactly_at_the_optimum():
+    at_optimum = HydroponicParams(ph_target=5.5, ph_optimal=5.5)
+    assert at_optimum.ph_availability_multiplier == pytest.approx(1.0)
+
+
+def test_ph_availability_multiplier_drops_continuously_on_both_sides_of_the_optimum():
+    at_optimum = HydroponicParams(ph_target=5.5, ph_optimal=5.5)
+    below = HydroponicParams(ph_target=5.0, ph_optimal=5.5)
+    above = HydroponicParams(ph_target=6.0, ph_optimal=5.5)
+    further_above = HydroponicParams(ph_target=6.5, ph_optimal=5.5)
+    assert below.ph_availability_multiplier < at_optimum.ph_availability_multiplier
+    assert above.ph_availability_multiplier < at_optimum.ph_availability_multiplier
+    # No flat zone: 6.0 and 6.5 must differ, unlike the old [5.5, 6.5] plateau where they didn't.
+    assert further_above.ph_availability_multiplier < above.ph_availability_multiplier
 
 
 def test_ph_availability_multiplier_uses_its_own_higher_cap_than_a_single_nutrient():
     # A pH excursion large enough to hit its individual cap should lose more than any single
     # damped-tier nutrient's cap (ph_availability_penalty_cap_fraction=0.15 vs. 0.02 default).
-    far_out = HydroponicParams(ph_target=10.0, ph_min_optimal=5.5, ph_max_optimal=6.5)
+    far_out = HydroponicParams(ph_target=10.0, ph_optimal=5.5)
     assert far_out.ph_availability_multiplier == pytest.approx(1.0 - 0.15)
 
 

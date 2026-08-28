@@ -308,6 +308,12 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
         * recipe_adequacy_multiplier
     )
     total_marketable_yield_kg = marketable_yield_kg_m2 * params.geometry.area_m2
+    # B1/B2/B2b/pH/recipe are all constant multiplicative factors for the whole run (EC/pH/recipe
+    # are static config values, not time-varying), so the same ratio applies at any day, not just
+    # the final one -- lets daily_series carry a marketable curve consistent with the summary's
+    # marketable_yield_kg_m2, instead of every other yield display in the app going stale/frozen
+    # relative to it whenever EC/pH/recipe move away from their reference values.
+    marketable_yield_ratio = marketable_yield_kg_m2 / final_yield_kg_m2 if final_yield_kg_m2 > 0 else 1.0
 
     return {
         "greenhouse_name": params.name,
@@ -353,6 +359,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "rh_in_pct": round(row.rh_in_pct, 1),
                 "vpd_kpa": round(row.vpd_kpa, 3),
                 "fruit_fresh_yield_kg_m2": round(row.fruit_fresh_yield_kg_m2, 3),
+                "marketable_yield_kg_m2": round(row.fruit_fresh_yield_kg_m2 * marketable_yield_ratio, 3),
                 "heat_used_kw": round(row.heat_used_kw, 1),
                 "screen_closed_hours": round(row.screen_closed_hours, 1),
                 "fan_pad_active_hours": round(row.fan_pad_active_hours, 1),

@@ -102,93 +102,112 @@ exactly equivalent to having used the EC-adjusted fraction from hour 1 — no ho
 needed. At the default `ec_target_ms_cm = 3.0`, this is a small effect (~0.2% below the base
 model's reported yield).
 
-**B2. EC/salinity → BER risk → marketable yield loss.** A study found the critical salinity
-threshold for a significant BER incidence increase is 3-4 dS/m, and marketable yield losses of
-8.9-33.8% (varying by year/severity) once past it. Source: [PMC — The Effects of Saline Water
-Drip Irrigation on Tomato Yield, Quality, and Blossom-End Rot Incidence](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4634986/)
-(search query: "blossom end rot tomato risk calcium high EC irrigation quantified percentage").
-Mechanism: high EC/salinity impairs calcium uptake (Ca is transported solely via the
-transpiration stream, so anything restricting water/Ca flow to the fruit — high EC, irregular
-irrigation, high humidity slowing transpiration — increases BER risk).
-
-**Implemented**: `ec_ber_threshold_ms_cm = 3.5` (SOURCED, midpoint of the 3-4 dS/m range),
-`ber_yield_loss_fraction_per_ms_cm_above_threshold = 0.10` (SOURCED mechanism, PLACEHOLDER slope —
-a judgment call within the cited 8.9-33.8% range, chosen by the user 2026-08-28 as the doc's own
-suggested default: a linear ramp reaching ~20% loss by threshold+2 mS/cm), capped at
-`ber_yield_loss_fraction_max = 0.35`. Formula (`HydroponicParams.ber_yield_loss_fraction`):
-`clamp(0, max_loss, slope * max(0, ec_target_ms_cm - ec_ber_threshold_ms_cm))`. At the default
-`ec_target_ms_cm = 3.0` (below the 3.5 threshold), loss is exactly 0 — doesn't disturb the current
-default-config run.
-
-**B2b. Low-EC side: nutrient deficiency → yield loss (added 2026-08-28, user-caught gap).** B1 and
-B2 above are both monotonic in EC and only penalize *high* EC — the first implementation of this
-section let marketable yield keep rising indefinitely as EC dropped toward zero, which the user
-flagged as unrealistic ("όσο χαμηλότερο είναι τόσο ανεβάζει το yield· θα έπρεπε να είναι καμπάνα,
-όχι γραμμικό"). Real hydroponic tomato trials confirm this: EC/yield is bell-shaped, not
-monotonic — one study found peak yield at EC 3 dS/m (rising from 0 up to that point, falling off
-above it), a range of ~2.0-3.0 dS/m is repeatedly cited elsewhere as the point below which yield
-drops off from under-fertilization, and industry guides describe low EC as causing nutrient
-starvation ("stunted growth and poor fruit quality"). Sources: search results summarizing
-[ResearchGate — The Effect of EC Levels of Nutrient Solution on the Growth, Yield, and Quality of
-Tomatoes under the Hydroponic System](https://www.researchgate.net/publication/261215803) (full
-PDF blocked by this session's egress proxy — sourced via the search engine's result summary only,
-same caveat as the Mg/photosynthesis source in the damped tier below) and general hydroponic-tomato
-grower guidance found via web search 2026-08-28 (query: "low EC nutrient solution tomato yield
+**B2/B2b. EC → BER risk / nutrient deficiency → marketable yield loss, a continuous bell curve
+(redesigned 2026-08-29 — see "Continuous-bell redesign" below for why).** A study found the
+critical salinity threshold for a significant BER incidence increase is 3-4 dS/m, with
+marketable yield losses of 8.9-33.8% (varying by year/severity) once past it. Source: [PMC — The
+Effects of Saline Water Drip Irrigation on Tomato Yield, Quality, and Blossom-End Rot
+Incidence](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4634986/) (search query: "blossom end
+rot tomato risk calcium high EC irrigation quantified percentage"). Mechanism: high EC/salinity
+impairs calcium uptake (Ca is transported solely via the transpiration stream, so anything
+restricting water/Ca flow to the fruit — high EC, irregular irrigation, high humidity slowing
+transpiration — increases BER risk). On the low-EC side, a too-dilute solution starves the plant
+of nutrients, reducing total growth/fruit set — a different mechanism from B1's fruit-concentration
+effect. Real hydroponic tomato trials confirm the combined response is bell-shaped with a single
+peak, not a flat range: one study found peak yield at EC 3 dS/m, rising continuously from 0 up to
+that point and falling continuously above it. Sources: search results summarizing [ResearchGate —
+The Effect of EC Levels of Nutrient Solution on the Growth, Yield, and Quality of Tomatoes under
+the Hydroponic System](https://www.researchgate.net/publication/261215803) (full PDF blocked by
+this session's egress proxy — sourced via the search engine's result summary only, same caveat as
+the Mg/photosynthesis source in the damped tier below) and general hydroponic-tomato grower
+guidance, found via web search 2026-08-28 (query: "low EC nutrient solution tomato yield
 reduction deficiency hydroponic dilute below optimal").
 
-**Implemented**: `ec_deficiency_threshold_ms_cm = 2.0` (SOURCED — the low end of the commonly-cited
-2.0-3.5 mS/cm target range already used elsewhere in this file, and consistent with the cited
-study's yield-rising-up-to-EC-3 finding), `ec_deficiency_yield_loss_fraction_per_ms_cm_below_threshold
-= 0.15` and `ec_deficiency_yield_loss_fraction_max = 0.50` (both PLACEHOLDER — steeper slope and
-higher cap than B2's BER mechanism, since a fully nutrient-starved solution constrains the plant's
-*total* growth directly, a more severe constraint than BER's fruit-specific quality effect).
-Formula (`HydroponicParams.ec_deficiency_yield_loss_fraction`): `clamp(0, max_loss, slope *
-max(0, ec_deficiency_threshold_ms_cm - ec_target_ms_cm))` — the mirror image of B2's formula.
-Applied as a third multiplicative factor in `marketable_yield_kg_m2` alongside B1 and B2. At the
-default `ec_target_ms_cm = 3.0` (above the 2.0 threshold), loss is exactly 0. Together with B2,
-this makes the full EC/yield response in this model a plateau-with-shoulders shape: flat across
-the [2.0, 3.5] commercial target range (only B1's small quality-driven drift applies there), falling
-off on both sides beyond it — a real bell shape, not the monotonic-in-EC curve from the initial
-implementation.
+**Implemented** (`HydroponicParams`): `ec_optimal_ms_cm = 3.0` (SOURCED — the study's peak-yield
+point, also the middle of the commonly-cited 2.0-3.5 mS/cm commercial target range from Level A
+above). Two independent quadratic curvatures, one per side of the peak (PLACEHOLDER magnitude,
+chosen to roughly preserve an earlier threshold-based version's loss at a reference point, not a
+literature-quantified curvature): `ec_high_side_curvature_per_ms_cm2 = 0.0444` (reaches 10% loss
+at EC 4.5) and `ec_low_side_curvature_per_ms_cm2 = 0.0375` (reaches 15% loss at EC 1.0), each
+capped (`ber_yield_loss_fraction_max = 0.35`, `ec_deficiency_yield_loss_fraction_max = 0.50` — the
+low side keeps the higher cap, since a fully nutrient-starved solution constrains the plant's
+*total* growth, a more severe constraint than BER's fruit-specific effect). Formulas
+(`HydroponicParams.ber_yield_loss_fraction` / `.ec_deficiency_yield_loss_fraction`):
+`clamp(0, max_loss, curvature * (ec_target_ms_cm - ec_optimal_ms_cm)^2)`, zero exactly at the
+peak and only at the peak — no flat zone on either side. At the default `ec_target_ms_cm = 3.0`
+(== the peak), both are exactly 0.
 
-### B3: pH → nutrient availability → marketable yield loss (added 2026-08-29)
+### B3: pH → nutrient availability → marketable yield loss, a continuous bell curve
 
 `ph_target` was SOURCED to the same 5.5-6.5 nutrient-availability range documented in Level A
 above, but explicitly left unimplemented ("pH's effect is much more a hard availability threshold
-than a continuous dial"). Implemented once the N/K/Mg/B damped tier's sufficiency-range pattern
-existed to reuse: outside [5.5, 6.5], specific nutrients become chemically unavailable to the
-plant even if physically present in solution — a real, well-documented soilless-culture mechanism
-(the classic nutrient-availability-vs-pH chart). A trial testing pH 4.5/5.0/5.5/6.0/6.5 found the
-highest tomato yield at pH 5.5, inside this range, consistent with the sourced band. Source:
-search results summarizing "The Influence of pH of Nutrient Solution On Yield and Nutritional
-Status of Tomato Plants Grown in Soilless Culture System" (ResearchGate, full text not accessed —
-blocked by this session's egress proxy, same caveat as the EC-deficiency source above), found via
-web search 2026-08-29 (query: "hydroponic tomato pH nutrient availability yield reduction outside
-optimal range 5.5-6.5 quantified percentage").
+than a continuous dial") until 2026-08-29. Outside the optimum, specific nutrients become
+progressively less chemically available to the plant even if physically present in solution — a
+real, well-documented soilless-culture mechanism (the classic nutrient-availability-vs-pH chart).
+A trial testing pH 4.5/5.0/5.5/6.0/6.5 found the highest tomato yield specifically at pH 5.5, not
+a flat optimum across a range. Source: search results summarizing "The Influence of pH of
+Nutrient Solution On Yield and Nutritional Status of Tomato Plants Grown in Soilless Culture
+System" (ResearchGate, full text not accessed — blocked by this session's egress proxy, same
+caveat as the EC source above), found via web search 2026-08-29 (query: "hydroponic tomato pH
+nutrient availability yield reduction outside optimal range 5.5-6.5 quantified percentage").
 
-**Implemented** (`HydroponicParams`): `ph_min_optimal = 5.5`, `ph_max_optimal = 6.5` (SOURCED,
-same range as `ph_target`'s own sourcing), `ph_availability_penalty_cap_fraction = 0.15`
-(PLACEHOLDER magnitude — no quantified tomato-specific percentage was found for pH excursions).
-Reuses the exact same sufficiency-range-penalty shape as the damped N/K/Mg/B tier below (the
-`_nutrient_penalty` method was generalized to take an optional `cap_fraction` override so both
-share one implementation) — but with its own higher cap (0.15 vs. the damped tier's 0.02 per
-nutrient), since pH gates the availability of *every* nutrient simultaneously, not one specific
-concentration. Reported as `ph_availability_multiplier` (`HydroponicParams.ph_availability_multiplier`,
-a property distinct from `recipe_adequacy_multiplier` since it's a different mechanism), applied
-as a fourth multiplicative factor in `marketable_yield_kg_m2` alongside B1/B2/B2b. At the default
-`ph_target = 6.0` (inside the range), the multiplier is exactly 1.0.
+**Implemented** (`HydroponicParams`): `ph_optimal = 5.5` (SOURCED, the trial's peak), a single
+quadratic curvature `ph_curvature_per_ph_unit2 = 0.0667` (PLACEHOLDER, chosen to reach the cap at
+1.5 pH units from the peak — no quantified tomato-specific figure was found), capped at
+`ph_availability_penalty_cap_fraction = 0.15` (PLACEHOLDER, higher than any single damped-tier
+nutrient below, since pH gates the availability of *every* nutrient simultaneously, not one
+specific concentration). Formula (`HydroponicParams.ph_availability_multiplier`):
+`1 - clamp(0, cap, curvature * (ph_target - ph_optimal)^2)`, zero loss exactly at the peak and
+only at the peak. At the default `ph_target = 6.0` (0.5 pH units from the peak, not exactly on
+it), the multiplier is ~0.983, not 1.0 — a small but real, permanent gap from the raw biomass
+yield even at default config.
+
+### Continuous-bell redesign (2026-08-29) — replaced a flat-plateau version of B2/B2b/B3
+
+The first implementation of B2/B2b (EC) and B3 (pH) used a **flat "sufficiency range" plus sharp
+threshold ramps** — the same pattern as the damped N/K/Mg/B tier below. The user caught this
+twice: first that EC only penalized high values (fixed by adding B2b, but B2b was *also*
+threshold-based, so the two together produced a flat zone across the whole [2.0, 3.5] mS/cm
+range with a sudden kink at each edge), then again that pH showed *zero* difference anywhere
+across [5.5, 6.5] — correctly flagged as implausible, since the underlying literature for both EC
+and pH actually reports a **single peak** (EC 3 dS/m, pH 5.5), not a flat-topped range. Real
+biological/chemical response curves to a continuous environmental dial like EC or pH are smooth
+and single-peaked; a flat-then-sharp-ramp shape was a modeling artifact of reusing the damped
+tier's discrete "concentration in range" pattern for the wrong kind of parameter.
+
+Both B2/B2b and B3 were rewritten as continuous parabolas (`curvature * distance²`, capped) peaked
+exactly at the literature-sourced optimum, with zero flat zone — any two EC or pH values, however
+close, now differ by some (possibly tiny) amount, and the response is monotonically worse the
+further from the peak on either side. N/K/Mg/B in the damped tier below were deliberately **not**
+changed to this shape: unlike EC/pH (continuous dials with a documented single yield-maximizing
+point), a nutrient *concentration* genuinely has a flat sufficiency range in real agronomy — uptake
+is adequate anywhere within a band, not maximized at one exact ppm value — so a flat zone there is
+not the same modeling gap.
+
+**Also fixed alongside this**: `daily_series` previously only carried the raw, EC/pH/recipe-
+unadjusted `fruit_fresh_yield_kg_m2` curve, so every other "yield" display in the app (the top
+header, the "Θερμοκήπιο"/"Καλλιέργεια" tab summary tiles, the greenhouse schematic's day-scrubber
+readout) stayed frozen at the raw biomass figure while only the "Συνταγή γεωπονίας" tab's
+`marketable_yield_kg_m2` responded to slider changes — flagged by the user as an inconsistency.
+Since B1/B2/B2b/B3/the damped tier are all constant multiplicative factors for the whole run
+(EC/pH/recipe are static config values, not time-varying), the same ratio
+`marketable_yield_kg_m2 / final_yield_kg_m2` applies at any day, not just the last one. Each
+`daily_series` row now also carries `marketable_yield_kg_m2 = fruit_fresh_yield_kg_m2 *
+that_ratio`, and every "yield" display in the app was switched to read the marketable figure
+(`final_yield_kg_m2` / `total_yield_kg` remain available in the summary and are shown once, in
+the "Καλλιέργεια" tab, explicitly labeled as the pre-adjustment raw biomass curve, for anyone who
+wants to see the base crop-model output).
 
 New summary outputs (`api/main.py` `/simulate`): `ec_adjusted_final_yield_kg_m2` (after B1),
 `ber_yield_loss_fraction`, `ec_deficiency_yield_loss_fraction`, `ph_availability_multiplier`,
 `recipe_adequacy_multiplier` (see damped tier below), `marketable_yield_kg_m2` (after B1, B2, B2b,
-B3, and the damped tier combined), `total_marketable_yield_kg`. The existing
-`daily_series.fruit_fresh_yield_kg_m2` chart stays as the base biomass-model curve, unadjusted —
-only the summary-level scalars carry the EC/pH/recipe adjustment, keeping the footprint small.
-Surfaced in the frontend's "Συνταγή γεωπονίας" tab, where `ec_target_ms_cm`, `ph_target`, `n_ppm`,
-`k_ppm`, `mg_ppm`, `b_ppm` are all exposed as interactive sliders (the only recipe fields with a
-real modeled effect — the informational tier stays display-only, since a slider would imply a
-model effect it doesn't have) via `/simulate` overrides, so a user can see marketable yield
-respond directly.
+B3, and the damped tier combined), `total_marketable_yield_kg`. `daily_series` rows gained
+`marketable_yield_kg_m2` alongside the existing unadjusted `fruit_fresh_yield_kg_m2`. Surfaced in
+the frontend's "Συνταγή γεωπονίας" tab, where `ec_target_ms_cm`, `ph_target`, `n_ppm`, `k_ppm`,
+`mg_ppm`, `b_ppm` are all exposed as interactive sliders (the only recipe fields with a real
+modeled effect — the informational tier stays display-only, since a slider would imply a model
+effect it doesn't have) via `/simulate` overrides, so a user can see marketable yield respond
+directly, consistently, everywhere in the app.
 
 ### Recipe "damped" tier: N, K, Mg, B — real mechanism, deliberately small/capped magnitude
 

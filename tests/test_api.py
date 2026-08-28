@@ -102,6 +102,7 @@ def test_simulate_daily_series_rows_have_expected_fields():
         "rh_in_pct",
         "vpd_kpa",
         "fruit_fresh_yield_kg_m2",
+        "marketable_yield_kg_m2",
         "heat_used_kw",
         "screen_closed_hours",
         "fan_pad_active_hours",
@@ -231,16 +232,21 @@ def test_fertigation_electricity_is_zero_when_transpiration_is_zero():
 
 
 def test_marketable_yield_equals_default_config_at_default_ec():
-    # Default config: ec_target_ms_cm=3.0 (below the 3.5 BER threshold) and n/k/mg/b_ppm all
-    # inside their sufficiency ranges -- so B2 and the recipe tier contribute nothing, only B1's
-    # small EC-vs-2.3-reference dry-matter adjustment applies. duration_days must be past
-    # fruiting_start_days (config default 35) so final_yield_kg_m2 is actually nonzero.
+    # Default config: ec_target_ms_cm=3.0 == ec_optimal_ms_cm (the peak) and n/k/mg/b_ppm all
+    # inside their sufficiency ranges -- so B2 and the recipe tier contribute nothing. pH's
+    # default (6.0) is NOT exactly ph_optimal (5.5, continuous curve, no flat zone) so it does
+    # contribute a small loss. duration_days must be past fruiting_start_days (config default 35)
+    # so final_yield_kg_m2 is actually nonzero.
     body = client.post("/simulate", json={"duration_days": 60}).json()
     summary = body["summary"]
     assert summary["ber_yield_loss_fraction"] == 0.0
+    assert summary["ec_deficiency_yield_loss_fraction"] == 0.0
     assert summary["recipe_adequacy_multiplier"] == pytest.approx(1.0)
+    assert summary["ph_availability_multiplier"] < 1.0
     assert summary["ec_adjusted_final_yield_kg_m2"] < summary["final_yield_kg_m2"]
-    assert summary["marketable_yield_kg_m2"] == pytest.approx(summary["ec_adjusted_final_yield_kg_m2"])
+    assert summary["marketable_yield_kg_m2"] == pytest.approx(
+        summary["ec_adjusted_final_yield_kg_m2"] * summary["ph_availability_multiplier"]
+    )
 
 
 def test_marketable_yield_kg_m2_matches_hand_computed_formula():
@@ -255,7 +261,11 @@ def test_marketable_yield_kg_m2_matches_hand_computed_formula():
     assert summary["ec_adjusted_final_yield_kg_m2"] == pytest.approx(expected_ec_adjusted, rel=1e-6)
 
     expected_marketable = (
-        expected_ec_adjusted * (1.0 - summary["ber_yield_loss_fraction"]) * summary["recipe_adequacy_multiplier"]
+        expected_ec_adjusted
+        * (1.0 - summary["ber_yield_loss_fraction"])
+        * (1.0 - summary["ec_deficiency_yield_loss_fraction"])
+        * summary["ph_availability_multiplier"]
+        * summary["recipe_adequacy_multiplier"]
     )
     assert summary["marketable_yield_kg_m2"] == pytest.approx(expected_marketable, rel=1e-6)
     assert summary["total_marketable_yield_kg"] == pytest.approx(
@@ -296,16 +306,44 @@ def test_nutrient_ppm_override_out_of_range_reduces_recipe_adequacy():
 
 
 def test_ph_target_override_out_of_range_reduces_marketable_yield():
-    baseline = client.post("/simulate", json={"duration_days": 60}).json()["summary"]
-    assert baseline["ph_availability_multiplier"] == pytest.approx(1.0)
+    # ph_optimal (config default 5.5) is the true peak -- a continuous curve, no flat zone -- so
+    # only ph_target=5.5 itself is loss-free; the config default ph_target=6.0 already carries a
+    # small loss.
+    at_optimum = client.post("/simulate", json={"duration_days": 60, "ph_target": 5.5}).json()["summary"]
+    assert at_optimum["ph_availability_multiplier"] == pytest.approx(1.0)
+
+    baseline = client.post("/simulate", json={"duration_days": 60}).json()["summary"]  # ph_target=6.0
+    assert baseline["ph_availability_multiplier"] < 1.0
+    assert baseline["marketable_yield_kg_m2"] < at_optimum["marketable_yield_kg_m2"]
 
     high_ph = client.post("/simulate", json={"duration_days": 60, "ph_target": 8.0}).json()["summary"]
-    assert high_ph["ph_availability_multiplier"] < 1.0
+    assert high_ph["ph_availability_multiplier"] < baseline["ph_availability_multiplier"]
     assert high_ph["marketable_yield_kg_m2"] < baseline["marketable_yield_kg_m2"]
 
     low_ph = client.post("/simulate", json={"duration_days": 60, "ph_target": 4.5}).json()["summary"]
     assert low_ph["ph_availability_multiplier"] < 1.0
-    assert low_ph["marketable_yield_kg_m2"] < baseline["marketable_yield_kg_m2"]
+    assert low_ph["marketable_yield_kg_m2"] < at_optimum["marketable_yield_kg_m2"]
+
+
+def test_ph_yield_response_has_no_flat_zone_around_the_peak():
+    # Two pH values both inside the old "5.5-6.5 sufficiency range" must now differ -- the whole
+    # point of the continuous-bell redesign (a flat plateau there was the bug the user caught).
+    near_peak = client.post("/simulate", json={"duration_days": 60, "ph_target": 5.5}).json()["summary"]
+    slightly_off = client.post("/simulate", json={"duration_days": 60, "ph_target": 6.0}).json()["summary"]
+    assert slightly_off["ph_availability_multiplier"] < near_peak["ph_availability_multiplier"]
+
+
+def test_daily_series_marketable_yield_is_consistent_with_the_summary_figure():
+    # The user noticed the yield shown in other tabs (fed by the daily_series' raw
+    # fruit_fresh_yield_kg_m2) didn't match the recipe tab's marketable_yield_kg_m2 summary figure
+    # whenever EC/pH/recipe moved away from their reference values -- daily_series now also
+    # carries a marketable_yield_kg_m2 column, scaled by the same constant ratio, so the last
+    # day's value must equal the summary's marketable_yield_kg_m2.
+    body = client.post("/simulate", json={"duration_days": 60, "ec_target_ms_cm": 4.5}).json()
+    summary = body["summary"]
+    last_day = body["daily_series"][-1]
+    assert last_day["marketable_yield_kg_m2"] == pytest.approx(summary["marketable_yield_kg_m2"], abs=1e-2)
+    assert last_day["marketable_yield_kg_m2"] != last_day["fruit_fresh_yield_kg_m2"]
 
 
 def test_recirculation_electricity_is_bounded_by_its_fixed_fan_power():
