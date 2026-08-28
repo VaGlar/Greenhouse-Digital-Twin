@@ -79,6 +79,11 @@ def test_simulate_response_has_expected_summary_fields():
         "steady_state_truss_rate_per_week",
         "co2_ambient_ppm",
         "max_co2_available_ppm",
+        "ec_adjusted_final_yield_kg_m2",
+        "ber_yield_loss_fraction",
+        "recipe_adequacy_multiplier",
+        "marketable_yield_kg_m2",
+        "total_marketable_yield_kg",
     ):
         assert key in summary
 
@@ -218,6 +223,42 @@ def test_fertigation_electricity_is_zero_when_transpiration_is_zero():
         if row["irrigation_water_l_day"] == 0:
             assert row["fertigation_elec_kw"] == 0
             assert row["fertilizer_dosed_g_day"] == 0
+
+
+# -- hydroponics Level B (EC -> fruit dry matter / BER risk, damped N/K/Mg/B recipe tier) --
+
+
+def test_marketable_yield_equals_default_config_at_default_ec():
+    # Default config: ec_target_ms_cm=3.0 (below the 3.5 BER threshold) and n/k/mg/b_ppm all
+    # inside their sufficiency ranges -- so B2 and the recipe tier contribute nothing, only B1's
+    # small EC-vs-2.3-reference dry-matter adjustment applies. duration_days must be past
+    # fruiting_start_days (config default 35) so final_yield_kg_m2 is actually nonzero.
+    body = client.post("/simulate", json={"duration_days": 60}).json()
+    summary = body["summary"]
+    assert summary["ber_yield_loss_fraction"] == 0.0
+    assert summary["recipe_adequacy_multiplier"] == pytest.approx(1.0)
+    assert summary["ec_adjusted_final_yield_kg_m2"] < summary["final_yield_kg_m2"]
+    assert summary["marketable_yield_kg_m2"] == pytest.approx(summary["ec_adjusted_final_yield_kg_m2"])
+
+
+def test_marketable_yield_kg_m2_matches_hand_computed_formula():
+    body = client.post("/simulate", json={"duration_days": 5}).json()
+    summary = body["summary"]
+    config = client.get("/config").json()["hydroponic"]
+
+    effective_dry_matter_ratio = 1.0 + config["ec_dry_matter_slope_per_ms_cm"] * (
+        config["ec_target_ms_cm"] - config["ec_dry_matter_reference_ms_cm"]
+    )
+    expected_ec_adjusted = summary["final_yield_kg_m2"] / effective_dry_matter_ratio
+    assert summary["ec_adjusted_final_yield_kg_m2"] == pytest.approx(expected_ec_adjusted, rel=1e-6)
+
+    expected_marketable = (
+        expected_ec_adjusted * (1.0 - summary["ber_yield_loss_fraction"]) * summary["recipe_adequacy_multiplier"]
+    )
+    assert summary["marketable_yield_kg_m2"] == pytest.approx(expected_marketable, rel=1e-6)
+    assert summary["total_marketable_yield_kg"] == pytest.approx(
+        summary["marketable_yield_kg_m2"] * summary["area_m2"], rel=1e-6
+    )
 
 
 def test_recirculation_electricity_is_bounded_by_its_fixed_fan_power():

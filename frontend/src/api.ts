@@ -40,6 +40,27 @@ export interface GreenhouseConfig {
     ec_target_ms_cm: number;
     ph_target: number;
     drainage_target_fraction: number;
+    /** Damped recipe tier (hydroponics.md "Level B"): actual recipe ppm + sufficiency range. */
+    n_ppm: number;
+    n_min_optimal_ppm: number;
+    n_max_optimal_ppm: number;
+    k_ppm: number;
+    k_min_optimal_ppm: number;
+    k_max_optimal_ppm: number;
+    mg_ppm: number;
+    mg_min_optimal_ppm: number;
+    mg_max_optimal_ppm: number;
+    b_ppm: number;
+    b_min_optimal_ppm: number;
+    b_max_optimal_ppm: number;
+    /** Informational recipe tier -- reference only, no model effect. */
+    p_ppm: number;
+    s_ppm: number;
+    fe_ppm: number;
+    mn_ppm: number;
+    zn_ppm: number;
+    cu_ppm: number;
+    mo_ppm: number;
     [key: string]: unknown;
   };
   simulation: { start_date: string; duration_days: number; timestep_hours: number };
@@ -100,6 +121,18 @@ export interface SimulationResult {
   summary: {
     final_yield_kg_m2: number;
     total_yield_kg: number;
+    /** Hydroponics Level B: final_yield_kg_m2 after the EC-vs-reference dry-matter adjustment
+     * (B1) -- higher EC concentrates fruit dry matter, so fresh-weight yield goes down. */
+    ec_adjusted_final_yield_kg_m2: number;
+    /** Hydroponics Level B2: fraction of ec_adjusted_final_yield_kg_m2 lost to BER
+     * (Blossom End Rot) risk once EC exceeds the salinity threshold; 0 below it. */
+    ber_yield_loss_fraction: number;
+    /** Damped recipe tier (N/K/Mg/B): combined multiplicative yield effect, 1.0 when all four
+     * are within their sufficiency range, floored so the tier can't swing yield too far. */
+    recipe_adequacy_multiplier: number;
+    /** Final marketable yield per m2 after B1, B2, and the damped recipe tier. */
+    marketable_yield_kg_m2: number;
+    total_marketable_yield_kg: number;
     area_m2: number;
     duration_days: number;
     total_heat_used_kwh: number;

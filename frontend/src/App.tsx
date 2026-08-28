@@ -449,11 +449,14 @@ function App() {
               <>
                 <p className="side-note">
                   Το EC/pH του θρεπτικού διαλύματος <strong>τροφοδοτεί πραγματικά την
-                  προσομοίωση</strong> (νερό, ηλεκτρικό αντλίας, λίπασμα — δες tab
-                  «Καλλιέργεια» για τα αποτελέσματα, ο στόχος drainage βρίσκεται εκεί). Το
-                  φορτίο καρπού/κλάδεμα (στελέχη/φυτό, καρποί/τσαμπί) βρίσκεται επίσης στο
-                  «Καλλιέργεια». Η επικονίαση παρακάτω παραμένει <strong>πληροφοριακή</strong> —{" "}
-                  <strong>δεν επηρεάζει ακόμα την προσομοίωση</strong>. Οι στόχοι κλίματος
+                  προσομοίωση</strong> (νερό, ηλεκτρικό αντλίας, λίπασμα, και πλέον και το
+                  marketable yield μέσω EC→ξηρή ουσία καρπού και κινδύνου BER — δες παρακάτω). Το
+                  φορτίο καρπού/κλάδεμα (στελέχη/φυτό, καρποί/τσαμπί) βρίσκεται στο tab
+                  «Καλλιέργεια». Τα N/K/Mg/B παρακάτω έχουν <strong>πραγματικό αλλά σκόπιμα
+                  περιορισμένο (capped) effect</strong> στο marketable yield όταν βγαίνουν εκτός
+                  του εύρους επάρκειας. Τα υπόλοιπα στοιχεία (P/S/Fe/Mn/Zn/Cu/Mo) και η
+                  επικονίαση παραμένουν <strong>πληροφοριακά</strong> —{" "}
+                  <strong>δεν επηρεάζουν την προσομοίωση</strong>. Οι στόχοι κλίματος
                   (θερμοκρασία, CO₂, αφύγρανση) βρίσκονται στο tab «Καιρός».
                 </p>
                 {config && (
@@ -469,8 +472,78 @@ function App() {
                     </div>
                   </dl>
                 )}
+                {config && (
+                  <dl className="spec-list">
+                    <div className="spec-section-label">Θρεπτικά (N/K/Mg/B) — έχουν πραγματικό effect</div>
+                    <div className="spec-row">
+                      <dt>N</dt>
+                      <dd>
+                        {config.hydroponic.n_ppm.toFixed(0)} ppm (επάρκεια{" "}
+                        {config.hydroponic.n_min_optimal_ppm.toFixed(0)}–
+                        {config.hydroponic.n_max_optimal_ppm.toFixed(0)})
+                      </dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>K</dt>
+                      <dd>
+                        {config.hydroponic.k_ppm.toFixed(0)} ppm (επάρκεια{" "}
+                        {config.hydroponic.k_min_optimal_ppm.toFixed(0)}–
+                        {config.hydroponic.k_max_optimal_ppm.toFixed(0)})
+                      </dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>Mg</dt>
+                      <dd>
+                        {config.hydroponic.mg_ppm.toFixed(0)} ppm (επάρκεια{" "}
+                        {config.hydroponic.mg_min_optimal_ppm.toFixed(0)}–
+                        {config.hydroponic.mg_max_optimal_ppm.toFixed(0)})
+                      </dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>B</dt>
+                      <dd>
+                        {config.hydroponic.b_ppm.toFixed(2)} ppm (επάρκεια{" "}
+                        {config.hydroponic.b_min_optimal_ppm.toFixed(2)}–
+                        {config.hydroponic.b_max_optimal_ppm.toFixed(2)})
+                      </dd>
+                    </div>
+                  </dl>
+                )}
+                {config && (
+                  <dl className="spec-list">
+                    <div className="spec-section-label">Λοιπά στοιχεία — πληροφοριακά</div>
+                    <div className="spec-row">
+                      <dt>P</dt>
+                      <dd>{config.hydroponic.p_ppm.toFixed(0)} ppm</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>S</dt>
+                      <dd>{config.hydroponic.s_ppm.toFixed(0)} ppm</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>Fe</dt>
+                      <dd>{config.hydroponic.fe_ppm.toFixed(2)} ppm</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>Mn</dt>
+                      <dd>{config.hydroponic.mn_ppm.toFixed(2)} ppm</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>Zn</dt>
+                      <dd>{config.hydroponic.zn_ppm.toFixed(2)} ppm</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>Cu</dt>
+                      <dd>{config.hydroponic.cu_ppm.toFixed(2)} ppm</dd>
+                    </div>
+                    <div className="spec-row">
+                      <dt>Mo</dt>
+                      <dd>{config.hydroponic.mo_ppm.toFixed(2)} ppm</dd>
+                    </div>
+                  </dl>
+                )}
                 <dl className="spec-list">
-                  <div className="spec-section-label">Επικονίαση</div>
+                  <div className="spec-section-label">Επικονίαση — πληροφοριακή</div>
                   <div className="spec-row">
                     <dt>Μέθοδος</dt>
                     <dd>Κυψέλες Bombus terrestris</dd>
@@ -708,10 +781,30 @@ function App() {
           )}
 
           {activeTab === "recipe" && (
-            <p className="side-note">
-              Η συνταγή γεωπονίας δεν επηρεάζει ακόμα την προσομοίωση, οπότε δεν υπάρχουν
-              αποτελέσματα να δείξουμε εδώ.
-            </p>
+            <>
+              {result ? (
+                <section className="stat-row">
+                  <StatTile
+                    label="Marketable yield"
+                    value={`${result.summary.marketable_yield_kg_m2.toFixed(2)} kg/m²`}
+                  />
+                  <StatTile
+                    label="Συνολικό marketable yield"
+                    value={`${result.summary.total_marketable_yield_kg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`}
+                  />
+                  <StatTile
+                    label="Απώλεια από BER risk"
+                    value={`${(result.summary.ber_yield_loss_fraction * 100).toFixed(1)}%`}
+                  />
+                  <StatTile
+                    label="Recipe adequacy (N/K/Mg/B)"
+                    value={`${(result.summary.recipe_adequacy_multiplier * 100).toFixed(1)}%`}
+                  />
+                </section>
+              ) : (
+                <p className="side-note">Τρέξε μια προσομοίωση για να δεις marketable yield.</p>
+              )}
+            </>
           )}
 
           {activeTab === "crop" && (
