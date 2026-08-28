@@ -8,9 +8,11 @@ what surfaces these as client errors when set via API overrides.
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
-from twin.params import ClimateControlParams, HydroponicParams
+from twin.params import ClimateControlParams, CHPParams, CropParams, GeometryParams, HydroponicParams, SimulationParams
 
 
 def _params(**overrides):
@@ -40,6 +42,159 @@ def test_rejects_co2_day_setpoint_below_ambient():
 
 def test_accepts_co2_day_setpoint_equal_to_ambient():
     _params(co2_setpoint_day_ppm=420.0, co2_ambient_ppm=420.0)
+
+
+def test_rejects_vent_max_ach_below_vent_min_ach():
+    with pytest.raises(ValueError, match="vent_max_ach"):
+        _params(vent_max_ach=1.0, vent_min_ach=5.0)
+
+
+def test_rejects_non_positive_dehumidification_capacity():
+    with pytest.raises(ValueError, match="dehumidification_capacity_kg_water_per_hour"):
+        _params(dehumidification_capacity_kg_water_per_hour=0)
+
+
+def test_rejects_non_positive_recirculation_fan_power():
+    with pytest.raises(ValueError, match="recirculation_fan_power_kw"):
+        _params(recirculation_fan_power_kw=0)
+
+
+# -- GeometryParams --
+
+
+def _geometry(**overrides):
+    defaults = dict(area_m2=5000.0, height_m=5.0, cover_u_value_w_m2k=4.0, cover_transmissivity=0.9)
+    defaults.update(overrides)
+    return GeometryParams(**defaults)
+
+
+def test_geometry_rejects_non_positive_area():
+    with pytest.raises(ValueError, match="area_m2"):
+        _geometry(area_m2=0)
+
+
+def test_geometry_rejects_non_positive_height():
+    with pytest.raises(ValueError, match="height_m"):
+        _geometry(height_m=0)
+
+
+def test_geometry_rejects_transmissivity_outside_zero_one():
+    with pytest.raises(ValueError, match="cover_transmissivity"):
+        _geometry(cover_transmissivity=1.5)
+
+
+def test_geometry_rejects_non_positive_cover_u_value():
+    with pytest.raises(ValueError, match="cover_u_value_w_m2k"):
+        _geometry(cover_u_value_w_m2k=0)
+
+
+# -- CHPParams --
+
+
+def _chp(**overrides):
+    defaults = dict(electric_power_kw=1000.0, heat_to_power_ratio=1.15, co2_kg_per_kwh_elec=0.18)
+    defaults.update(overrides)
+    return CHPParams(**defaults)
+
+
+def test_chp_rejects_non_positive_electric_power():
+    with pytest.raises(ValueError, match="electric_power_kw"):
+        _chp(electric_power_kw=0)
+
+
+def test_chp_rejects_negative_heat_to_power_ratio():
+    with pytest.raises(ValueError, match="heat_to_power_ratio"):
+        _chp(heat_to_power_ratio=-0.1)
+
+
+def test_chp_rejects_negative_co2_per_kwh():
+    with pytest.raises(ValueError, match="co2_kg_per_kwh_elec"):
+        _chp(co2_kg_per_kwh_elec=-0.1)
+
+
+# -- CropParams: base fields --
+
+
+def _crop(**overrides):
+    defaults = dict(variety="Example", planting_date=date(2026, 1, 1), density_plants_per_m2=2.5)
+    defaults.update(overrides)
+    return CropParams(**defaults)
+
+
+def test_crop_rejects_non_positive_density():
+    with pytest.raises(ValueError, match="density_plants_per_m2"):
+        _crop(density_plants_per_m2=0)
+
+
+def test_crop_rejects_non_positive_reference_density():
+    with pytest.raises(ValueError, match="reference_density_plants_per_m2"):
+        _crop(reference_density_plants_per_m2=0)
+
+
+def test_crop_rejects_non_positive_lai_max():
+    with pytest.raises(ValueError, match="lai_max"):
+        _crop(lai_max=0)
+
+
+def test_crop_rejects_dry_matter_content_outside_zero_one():
+    with pytest.raises(ValueError, match="dry_matter_content_fruit"):
+        _crop(dry_matter_content_fruit=1.5)
+
+
+# -- CropParams: variety-dependent fields (fruit weight, truss rate, stems, temperature curves) --
+
+
+def test_crop_rejects_non_positive_target_fruit_weight():
+    with pytest.raises(ValueError, match="target_fruit_weight_g"):
+        _crop(target_fruit_weight_g=0)
+
+
+def test_crop_rejects_non_positive_fruits_per_truss():
+    with pytest.raises(ValueError, match="fruits_per_truss"):
+        _crop(fruits_per_truss=0)
+
+
+def test_crop_rejects_stems_per_plant_outside_one_or_two():
+    with pytest.raises(ValueError, match="stems_per_plant"):
+        _crop(stems_per_plant=3)
+
+
+def test_crop_accepts_stems_per_plant_one_or_two():
+    _crop(stems_per_plant=1)
+    _crop(stems_per_plant=2)
+
+
+def test_crop_rejects_photosynthesis_temperature_thresholds_out_of_order():
+    with pytest.raises(ValueError, match="photosynthesis_t_min_c"):
+        _crop(photosynthesis_t_min_c=30.0, photosynthesis_t_opt_c=27.0, photosynthesis_t_max_c=35.0)
+
+
+def test_crop_rejects_fruit_set_temperature_thresholds_out_of_order():
+    with pytest.raises(ValueError, match="fruit_set_t_min_c"):
+        _crop(fruit_set_t_min_c=20.0, fruit_set_t_opt_c=18.0, fruit_set_t_max_c=24.0)
+
+
+def test_crop_rejects_non_positive_canopy_light_extinction_coeff():
+    with pytest.raises(ValueError, match="canopy_light_extinction_coeff"):
+        _crop(canopy_light_extinction_coeff=0)
+
+
+def test_crop_rejects_non_positive_maintenance_respiration_fraction():
+    with pytest.raises(ValueError, match="maintenance_respiration_fraction_per_day"):
+        _crop(maintenance_respiration_fraction_per_day=0)
+
+
+# -- SimulationParams --
+
+
+def test_simulation_rejects_non_positive_duration_days():
+    with pytest.raises(ValueError, match="duration_days"):
+        SimulationParams(start_date=date(2026, 1, 1), duration_days=0)
+
+
+def test_simulation_rejects_non_positive_timestep_hours():
+    with pytest.raises(ValueError, match="timestep_hours"):
+        SimulationParams(start_date=date(2026, 1, 1), timestep_hours=0)
 
 
 # -- HydroponicParams (hydroponics.md Level A) --
@@ -76,6 +231,11 @@ def test_hydroponic_params_rejects_zero_fertilizer_conversion_factor():
 def test_hydroponic_params_rejects_inverted_nutrient_range():
     with pytest.raises(ValueError, match="n_max_optimal_ppm"):
         HydroponicParams(n_min_optimal_ppm=150.0, n_max_optimal_ppm=60.0)
+
+
+def test_hydroponic_params_rejects_non_positive_nutrient_range_minimum():
+    with pytest.raises(ValueError, match="k_min_optimal_ppm"):
+        HydroponicParams(k_min_optimal_ppm=0.0)
 
 
 def test_hydroponic_params_rejects_negative_ec_high_side_curvature():
