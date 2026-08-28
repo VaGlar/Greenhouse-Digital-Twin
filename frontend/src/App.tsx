@@ -4,6 +4,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -388,13 +389,13 @@ function App() {
   );
   const yieldChart = (
     <ComparableChart
-      title="Σωρευτική παραγωγή τομάτας"
+      title="Σωρευτική παραγωγή τομάτας (marketable)"
       unit=" kg/m²"
       height={320}
       data={chartData}
       xKey={xKey}
       viewedX={viewedX}
-      series={buildSeries([{ key: "fruit_fresh_yield_kg_m2", name: "Yield", color: "var(--series-4)" }], isCompare)}
+      series={buildSeries([{ key: "marketable_yield_kg_m2", name: "Marketable yield", color: "var(--series-4)" }], isCompare)}
     />
   );
   const fruitSetChart = (
@@ -427,6 +428,13 @@ function App() {
       )}
     />
   );
+  // Level B continuous bell curves (see docs/assumptions/hydroponics.md "Continuous-bell
+  // redesign") -- computed client-side from the same config fields the backend uses, so the
+  // recipe tab can show the whole EC/pH yield-response shape, not just the current point.
+  const ecCurveData = config ? buildCurveData((ec) => ecCurvePercent(config, ec), 1.5, 6.0, 45) : [];
+  const ecCurrentY = config ? ecCurvePercent(config, sliderValues.ec_target_ms_cm) : 0;
+  const phCurveData = config ? buildCurveData((ph) => phCurvePercent(config, ph), 4.5, 8.0, 45) : [];
+  const phCurrentY = config ? phCurvePercent(config, sliderValues.ph_target) : 0;
 
   return (
     <div className="dashboard">
@@ -795,9 +803,9 @@ function App() {
             </section>
           )}
 
-          {activeTab === "recipe" && (
+          {activeTab === "recipe" && config && (
             <>
-              {result ? (
+              {result && (
                 <section className="stat-row">
                   <StatTile
                     label="Marketable yield"
@@ -824,6 +832,29 @@ function App() {
                     value={`${(result.summary.recipe_adequacy_multiplier * 100).toFixed(1)}%`}
                   />
                 </section>
+              )}
+              <div className="chart-grid">
+                <BellCurveChart
+                  title="Καμπύλη yield vs. EC"
+                  subtitle={`Peak στα ${config.hydroponic.ec_optimal_ms_cm.toFixed(1)} mS/cm -- η κουκκίδα δείχνει την τρέχουσα τιμή του slider.`}
+                  xLabel="mS/cm"
+                  data={ecCurveData}
+                  currentX={sliderValues.ec_target_ms_cm}
+                  currentY={ecCurrentY}
+                  color="var(--series-4)"
+                />
+                <BellCurveChart
+                  title="Καμπύλη yield vs. pH"
+                  subtitle={`Peak στο pH ${config.hydroponic.ph_optimal.toFixed(1)} -- η κουκκίδα δείχνει την τρέχουσα τιμή του slider.`}
+                  xLabel="pH"
+                  data={phCurveData}
+                  currentX={sliderValues.ph_target}
+                  currentY={phCurrentY}
+                  color="var(--series-3)"
+                />
+              </div>
+              {result ? (
+                yieldChart
               ) : (
                 <p className="side-note">Τρέξε μια προσομοίωση για να δεις marketable yield.</p>
               )}
@@ -1144,6 +1175,94 @@ function Sparkline({ data, dataKey, color }: { data: DailyPoint[]; dataKey: keyo
   );
 }
 
+/** Level B continuous bell curves (see docs/assumptions/hydroponics.md "Continuous-bell
+ * redesign"), reimplemented client-side from the same HydroponicParams formulas
+ * (twin/params.py: effective_dry_matter_content_fruit / ber_yield_loss_fraction /
+ * ec_deficiency_yield_loss_fraction) so the recipe tab can plot the whole EC yield-response
+ * shape, not just the isolated point the backend reports post-run. Returns the EC-only
+ * contribution to marketable yield as a percentage (B1 x B2 x B2b, holding pH/recipe fixed --
+ * those are independent multiplicative factors, see api/main.py). */
+function ecCurvePercent(config: GreenhouseConfig, ec: number): number {
+  const h = config.hydroponic;
+  const dryMatterRatio = 1 + h.ec_dry_matter_slope_per_ms_cm * (ec - h.ec_dry_matter_reference_ms_cm);
+  const berLoss =
+    ec > h.ec_optimal_ms_cm
+      ? Math.min(h.ber_yield_loss_fraction_max, h.ec_high_side_curvature_per_ms_cm2 * (ec - h.ec_optimal_ms_cm) ** 2)
+      : 0;
+  const deficiencyLoss =
+    ec < h.ec_optimal_ms_cm
+      ? Math.min(
+          h.ec_deficiency_yield_loss_fraction_max,
+          h.ec_low_side_curvature_per_ms_cm2 * (h.ec_optimal_ms_cm - ec) ** 2,
+        )
+      : 0;
+  return (1 / dryMatterRatio) * (1 - berLoss) * (1 - deficiencyLoss) * 100;
+}
+
+/** Same idea as ecCurvePercent, for pH (twin/params.py: HydroponicParams.ph_availability_multiplier). */
+function phCurvePercent(config: GreenhouseConfig, ph: number): number {
+  const h = config.hydroponic;
+  const loss = Math.min(h.ph_availability_penalty_cap_fraction, h.ph_curvature_per_ph_unit2 * (ph - h.ph_optimal) ** 2);
+  return (1 - loss) * 100;
+}
+
+function buildCurveData(fn: (x: number) => number, min: number, max: number, steps: number): { x: number; y: number }[] {
+  const points: { x: number; y: number }[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const x = min + ((max - min) * i) / steps;
+    points.push({ x: Math.round(x * 100) / 100, y: Math.round(fn(x) * 100) / 100 });
+  }
+  return points;
+}
+
+/** Static function-of-parameter curve (not a time series) -- unlike ComparableChart, this
+ * doesn't need a simulation result, so it's visible (and updates live) as soon as a slider
+ * moves, even before the user presses "Εκτέλεση προσομοίωσης". */
+function BellCurveChart({
+  title,
+  subtitle,
+  xLabel,
+  data,
+  currentX,
+  currentY,
+  color,
+}: {
+  title: string;
+  subtitle: string;
+  xLabel: string;
+  data: { x: number; y: number }[];
+  currentX: number;
+  currentY: number;
+  color: string;
+}) {
+  return (
+    <section className="chart-card">
+      <h2>{title}</h2>
+      <p className="chart-card-subtitle">{subtitle}</p>
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="var(--gridline)" vertical={false} />
+          <XAxis
+            dataKey="x"
+            type="number"
+            domain={[data[0]?.x ?? 0, data[data.length - 1]?.x ?? 0]}
+            stroke="var(--muted)"
+            tick={{ fontSize: 12 }}
+            label={{ value: xLabel, position: "insideBottomRight", offset: -4, fontSize: 11 }}
+          />
+          <YAxis stroke="var(--muted)" tick={{ fontSize: 12 }} unit="%" width={48} domain={[0, 105]} />
+          <Tooltip
+            contentStyle={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }}
+            formatter={(v: unknown) => [`${Number(v).toFixed(1)}%`, "Σχετικό yield"]}
+          />
+          <Line type="monotone" dataKey="y" stroke={color} strokeWidth={2} dot={false} isAnimationActive={false} name="Σχετικό yield" />
+          <ReferenceDot x={currentX} y={currentY} r={5} fill={color} stroke="var(--surface-1)" strokeWidth={2} />
+        </LineChart>
+      </ResponsiveContainer>
+    </section>
+  );
+}
+
 /** Compare-mode merges two runs by day-offset (index within each run), not
  * calendar date, since a baseline pinned from a different start_date/duration_days
  * would otherwise not align on the x-axis at all. */
@@ -1153,6 +1272,7 @@ const COMPARE_KEYS: (keyof DailyPoint)[] = [
   "rh_in_pct",
   "vpd_kpa",
   "fruit_fresh_yield_kg_m2",
+  "marketable_yield_kg_m2",
   "heat_used_kw",
   "screen_closed_hours",
   "fan_pad_active_hours",
@@ -1268,6 +1388,7 @@ function downloadCsv(result: SimulationResult) {
     "rh_in_pct",
     "vpd_kpa",
     "fruit_fresh_yield_kg_m2",
+    "marketable_yield_kg_m2",
     "heat_used_kw",
     "screen_closed_hours",
     "fan_pad_active_hours",
