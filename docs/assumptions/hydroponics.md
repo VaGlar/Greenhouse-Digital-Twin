@@ -209,6 +209,17 @@ modeled effect — the informational tier stays display-only, since a slider wou
 effect it doesn't have) via `/simulate` overrides, so a user can see marketable yield respond
 directly, consistently, everywhere in the app.
 
+**Added 2026-08-29**: the recipe tab also plots the whole EC and pH yield-response curves as two
+small bell-curve charts, not just the current point — the same `ecCurvePercent`/`phCurvePercent`
+formulas as `HydroponicParams`, reimplemented client-side in `frontend/src/App.tsx` from the
+config values `/config` already returns, with a marker dot at the slider's current position. These
+are static functions of config, so they render (and the dot moves) as soon as a slider is dragged,
+even before running a simulation — letting a user see exactly where they sit relative to the
+peak, which is what would have caught the flat-plateau bug above immediately, visually, instead of
+needing to be told by inspecting output numbers. The recipe tab also gained a per-day marketable
+yield chart (reusing the existing `daily_series.marketable_yield_kg_m2` column above) once a
+simulation has run, in the same chart style as the rest of the app.
+
 ### Recipe "damped" tier: N, K, Mg, B — real mechanism, deliberately small/capped magnitude
 
 Explicit user framing (2026-08-26): unlike Level B above (which should be as rigorously

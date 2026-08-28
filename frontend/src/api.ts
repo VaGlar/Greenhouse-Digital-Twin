@@ -40,6 +40,18 @@ export interface GreenhouseConfig {
     ec_target_ms_cm: number;
     ph_target: number;
     drainage_target_fraction: number;
+    /** Level B continuous bell curves (hydroponics.md "Continuous-bell redesign") -- used by the
+     * frontend to plot the EC/pH yield-response curves, not just read the current setpoint. */
+    ec_dry_matter_reference_ms_cm: number;
+    ec_dry_matter_slope_per_ms_cm: number;
+    ec_optimal_ms_cm: number;
+    ec_high_side_curvature_per_ms_cm2: number;
+    ec_low_side_curvature_per_ms_cm2: number;
+    ber_yield_loss_fraction_max: number;
+    ec_deficiency_yield_loss_fraction_max: number;
+    ph_optimal: number;
+    ph_curvature_per_ph_unit2: number;
+    ph_availability_penalty_cap_fraction: number;
     /** Damped recipe tier (hydroponics.md "Level B"): actual recipe ppm + sufficiency range. */
     n_ppm: number;
     n_min_optimal_ppm: number;
