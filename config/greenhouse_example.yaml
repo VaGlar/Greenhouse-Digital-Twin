@@ -105,6 +105,41 @@ hydroponic:
                                                     # (not this specific pump's spec)
   fertilizer_g_per_l_per_ec_unit: 0.64  # PLACEHOLDER: generic EC-to-TDS conversion factor
 
+  # Level B: EC -> fruit dry-matter (B1) and EC/salinity -> BER risk (B2). SOURCED thresholds,
+  # PLACEHOLDER slope (judgment call within the cited range). See docs/assumptions/hydroponics.md.
+  ec_dry_matter_reference_ms_cm: 2.3
+  ec_dry_matter_slope_per_ms_cm: 0.0028
+  ec_ber_threshold_ms_cm: 3.5
+  ber_yield_loss_fraction_per_ms_cm_above_threshold: 0.10
+  ber_yield_loss_fraction_max: 0.35
+
+  # Recipe "damped" tier: N/K/Mg/B -- real mechanism, deliberately capped magnitude. Ranges
+  # SOURCED (CEAC Arizona / Florida IFAS tomato formulas); penalty cap PLACEHOLDER.
+  n_ppm: 105.0
+  n_min_optimal_ppm: 60.0
+  n_max_optimal_ppm: 150.0
+  k_ppm: 300.0
+  k_min_optimal_ppm: 199.0
+  k_max_optimal_ppm: 400.0
+  mg_ppm: 65.0             # SOURCED: CEAC Arizona formula (constant across its 3 recipe variants)
+  mg_min_optimal_ppm: 45.0
+  mg_max_optimal_ppm: 70.0
+  b_ppm: 0.40               # SOURCED: CEAC Arizona micronutrient formula
+  b_min_optimal_ppm: 0.30
+  b_max_optimal_ppm: 0.50
+  damped_nutrient_penalty_cap_fraction: 0.02  # PLACEHOLDER
+  recipe_adequacy_multiplier_min: 0.85        # PLACEHOLDER
+
+  # Recipe "informational" tier: P/S/Fe/Mn/Zn/Cu/Mo -- displayed only, no model effect. SOURCED
+  # (CEAC Arizona formula; Mn/Zn have a notable disagreement with Florida IFAS, see hydroponics.md).
+  p_ppm: 62.0
+  s_ppm: 110.0
+  fe_ppm: 2.5
+  mn_ppm: 0.55
+  zn_ppm: 0.33
+  cu_ppm: 0.05
+  mo_ppm: 0.05
+
 weather:
   source: "csv_typical_year"   # SOURCED: real 10-year (2015-2024) hourly average for Αλεξάνδρεια Ημαθίας, via the
                                 # Open-Meteo Historical Weather API — see docs/assumptions/weather.md,

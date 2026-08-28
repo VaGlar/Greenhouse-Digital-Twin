@@ -68,3 +68,80 @@ def test_hydroponic_params_rejects_zero_pump_specific_power():
 def test_hydroponic_params_rejects_zero_fertilizer_conversion_factor():
     with pytest.raises(ValueError, match="fertilizer_g_per_l_per_ec_unit"):
         HydroponicParams(fertilizer_g_per_l_per_ec_unit=0.0)
+
+
+# -- HydroponicParams Level B (EC -> dry matter / BER, damped recipe tier) --
+
+
+def test_hydroponic_params_rejects_inverted_nutrient_range():
+    with pytest.raises(ValueError, match="n_max_optimal_ppm"):
+        HydroponicParams(n_min_optimal_ppm=150.0, n_max_optimal_ppm=60.0)
+
+
+def test_hydroponic_params_rejects_negative_ber_slope():
+    with pytest.raises(ValueError, match="ber_yield_loss_fraction_per_ms_cm_above_threshold"):
+        HydroponicParams(ber_yield_loss_fraction_per_ms_cm_above_threshold=-0.1)
+
+
+def test_hydroponic_params_rejects_recipe_adequacy_multiplier_min_of_zero():
+    with pytest.raises(ValueError, match="recipe_adequacy_multiplier_min"):
+        HydroponicParams(recipe_adequacy_multiplier_min=0.0)
+
+
+def test_effective_dry_matter_content_fruit_increases_with_ec():
+    low = HydroponicParams(ec_target_ms_cm=2.3)
+    high = HydroponicParams(ec_target_ms_cm=5.0)
+    assert low.effective_dry_matter_content_fruit == pytest.approx(1.0)
+    assert high.effective_dry_matter_content_fruit > low.effective_dry_matter_content_fruit
+
+
+def test_ber_yield_loss_fraction_is_zero_below_threshold():
+    params = HydroponicParams(ec_target_ms_cm=3.0, ec_ber_threshold_ms_cm=3.5)
+    assert params.ber_yield_loss_fraction == 0.0
+
+
+def test_ber_yield_loss_fraction_ramps_above_threshold_and_is_capped():
+    params = HydroponicParams(
+        ec_target_ms_cm=4.5,
+        ec_ber_threshold_ms_cm=3.5,
+        ber_yield_loss_fraction_per_ms_cm_above_threshold=0.10,
+        ber_yield_loss_fraction_max=0.35,
+    )
+    assert params.ber_yield_loss_fraction == pytest.approx(0.10)
+
+    capped = HydroponicParams(
+        ec_target_ms_cm=10.0,
+        ec_ber_threshold_ms_cm=3.5,
+        ber_yield_loss_fraction_per_ms_cm_above_threshold=0.10,
+        ber_yield_loss_fraction_max=0.35,
+    )
+    assert capped.ber_yield_loss_fraction == 0.35
+
+
+def test_recipe_adequacy_multiplier_is_one_when_all_nutrients_in_range():
+    params = HydroponicParams(n_ppm=105.0, k_ppm=300.0, mg_ppm=65.0, b_ppm=0.40)
+    assert params.recipe_adequacy_multiplier == pytest.approx(1.0)
+
+
+def test_recipe_adequacy_multiplier_drops_when_a_nutrient_is_out_of_range():
+    in_range = HydroponicParams(n_ppm=105.0)
+    # n_min_optimal_ppm=60, n_max_optimal_ppm=150 (range width 90) -- one full range-width below
+    # the lower boundary reaches the individual penalty cap exactly (0.02).
+    out_of_range = HydroponicParams(n_ppm=-30.0)
+    assert out_of_range.recipe_adequacy_multiplier < in_range.recipe_adequacy_multiplier
+    assert out_of_range.recipe_adequacy_multiplier == pytest.approx(1.0 - 0.02)
+
+
+def test_recipe_adequacy_multiplier_is_floored_even_with_multiple_out_of_range_nutrients():
+    # With all four nutrients far enough out of range to hit their individual penalty cap, and a
+    # generously large per-nutrient cap, the combined multiplier would fall below the floor --
+    # recipe_adequacy_multiplier_min must clamp it back up.
+    params = HydroponicParams(
+        n_ppm=-1000.0,
+        k_ppm=-1000.0,
+        mg_ppm=-1000.0,
+        b_ppm=-1000.0,
+        damped_nutrient_penalty_cap_fraction=0.5,
+        recipe_adequacy_multiplier_min=0.85,
+    )
+    assert params.recipe_adequacy_multiplier == pytest.approx(0.85)

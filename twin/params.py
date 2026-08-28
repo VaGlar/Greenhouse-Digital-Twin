@@ -328,6 +328,62 @@ class HydroponicParams:
     fertilizer_g_per_l_per_ec_unit: float = 0.64  # PLACEHOLDER: generic EC-to-TDS conversion
     # factor, not a specific fertilizer blend's real dosing curve -- see same source
 
+    # -- Level B: EC -> fruit dry-matter fraction (B1) --
+    # SOURCED: low-EC baseline from a study comparing 2.3 dS/m vs. 5.0 dS/m hydroponic tomato.
+    # See docs/assumptions/hydroponics.md ("Level B" section) for the derivation and source link.
+    ec_dry_matter_reference_ms_cm: float = 2.3
+    # SOURCED: midpoint of the study's observed 0.19-0.37 percentage-point dry-matter increase
+    # per +1 mS/cm (expressed here as a fraction, i.e. 0.0028 = 0.28 percentage points).
+    ec_dry_matter_slope_per_ms_cm: float = 0.0028
+
+    # -- Level B: EC/salinity -> BER (Blossom End Rot) risk -> marketable yield loss (B2) --
+    # SOURCED: midpoint of the 3-4 dS/m critical-salinity threshold range for a significant BER
+    # incidence increase. See docs/assumptions/hydroponics.md.
+    ec_ber_threshold_ms_cm: float = 3.5
+    # SOURCED mechanism, PLACEHOLDER slope: a judgment call within the cited 8.9-33.8%
+    # marketable-yield-loss range -- linear ramp reaching ~20% loss by threshold+2 mS/cm.
+    ber_yield_loss_fraction_per_ms_cm_above_threshold: float = 0.10
+    # PLACEHOLDER: cap on B2's yield-loss fraction regardless of how far EC exceeds the threshold.
+    ber_yield_loss_fraction_max: float = 0.35
+
+    # -- Recipe "damped" tier: N, K, Mg, B -- real mechanism, deliberately small/capped magnitude.
+    # Each nutrient's `_ppm` is the recipe's actual target concentration; `_min_optimal_ppm` /
+    # `_max_optimal_ppm` is the sufficiency range within which it costs nothing. Ranges are
+    # SOURCED (University of Arizona CEAC / University of Florida IFAS tomato formulas); the
+    # penalty magnitude (`damped_nutrient_penalty_cap_fraction`) is PLACEHOLDER -- the mechanism
+    # is real, the magnitude is a deliberate conservative guess. See docs/assumptions/hydroponics.md.
+    n_ppm: float = 105.0
+    n_min_optimal_ppm: float = 60.0
+    n_max_optimal_ppm: float = 150.0
+    k_ppm: float = 300.0
+    k_min_optimal_ppm: float = 199.0
+    k_max_optimal_ppm: float = 400.0
+    mg_ppm: float = 65.0  # SOURCED: CEAC Arizona tomato formula (constant across all 3 recipe variants)
+    mg_min_optimal_ppm: float = 45.0
+    mg_max_optimal_ppm: float = 70.0
+    b_ppm: float = 0.40  # SOURCED: CEAC Arizona micronutrient formula
+    b_min_optimal_ppm: float = 0.30
+    b_max_optimal_ppm: float = 0.50
+    # PLACEHOLDER: each of the four damped-tier nutrients is capped at this much individual yield
+    # penalty when its ppm is a full sufficiency-range-width beyond the range boundary (a linear
+    # ramp from 0 at the boundary to this cap at that distance, capped beyond it).
+    damped_nutrient_penalty_cap_fraction: float = 0.02
+    # PLACEHOLDER: floor on the combined multiplicative effect of all four damped-tier nutrients
+    # together, so the whole tier can never produce an unrealistically large swing.
+    recipe_adequacy_multiplier_min: float = 0.85
+
+    # -- Recipe "informational" tier: P, S, Fe, Mn, Zn, Cu, Mo -- displayed for reference only,
+    # not read by any physics (same treatment as the frontend's existing pollination block).
+    # SOURCED (CEAC Arizona formula, cross-checked against Florida IFAS where noted).
+    p_ppm: float = 62.0
+    s_ppm: float = 110.0  # CEAC: ~102-121 ppm across its 3 recipe variants, ~110 used as midpoint
+    fe_ppm: float = 2.5
+    mn_ppm: float = 0.55  # CEAC 0.55; Florida IFAS cites 0.62 -- sources disagree, CEAC used here
+    zn_ppm: float = 0.33  # CEAC 0.33; Florida IFAS cites 0.09 -- notable disagreement, CEAC used
+    # here since it's internally consistent with the other CEAC-sourced values above
+    cu_ppm: float = 0.05
+    mo_ppm: float = 0.05
+
     def __post_init__(self) -> None:
         if self.ec_target_ms_cm <= 0:
             raise ValueError("ec_target_ms_cm must be > 0")
@@ -339,6 +395,70 @@ class HydroponicParams:
             raise ValueError("irrigation_pump_specific_power_kwh_per_m3 must be > 0")
         if self.fertilizer_g_per_l_per_ec_unit <= 0:
             raise ValueError("fertilizer_g_per_l_per_ec_unit must be > 0")
+        if self.ec_dry_matter_reference_ms_cm <= 0:
+            raise ValueError("ec_dry_matter_reference_ms_cm must be > 0")
+        if self.ec_ber_threshold_ms_cm <= 0:
+            raise ValueError("ec_ber_threshold_ms_cm must be > 0")
+        if self.ber_yield_loss_fraction_per_ms_cm_above_threshold < 0:
+            raise ValueError("ber_yield_loss_fraction_per_ms_cm_above_threshold must be >= 0")
+        if not 0 < self.ber_yield_loss_fraction_max <= 1:
+            raise ValueError("ber_yield_loss_fraction_max must be in (0, 1]")
+        for label, lo, hi in (
+            ("n", self.n_min_optimal_ppm, self.n_max_optimal_ppm),
+            ("k", self.k_min_optimal_ppm, self.k_max_optimal_ppm),
+            ("mg", self.mg_min_optimal_ppm, self.mg_max_optimal_ppm),
+            ("b", self.b_min_optimal_ppm, self.b_max_optimal_ppm),
+        ):
+            if lo <= 0:
+                raise ValueError(f"{label}_min_optimal_ppm must be > 0")
+            if hi <= lo:
+                raise ValueError(f"{label}_max_optimal_ppm must be > {label}_min_optimal_ppm")
+        if not 0 <= self.damped_nutrient_penalty_cap_fraction <= 1:
+            raise ValueError("damped_nutrient_penalty_cap_fraction must be in [0, 1]")
+        if not 0 < self.recipe_adequacy_multiplier_min <= 1:
+            raise ValueError("recipe_adequacy_multiplier_min must be in (0, 1]")
+
+    @property
+    def effective_dry_matter_content_fruit(self) -> float:
+        """Level B1: EC-adjusted fruit dry-matter fraction (denser/smaller fruit at higher EC).
+
+        `dry_matter_content_fruit` (CropParams) is a constant divisor throughout the crop
+        model's run, so scaling it by this factor and dividing final yield by the ratio is
+        mathematically equivalent to having used the EC-adjusted fraction from hour 1 -- no
+        hourly-loop change needed. See docs/assumptions/hydroponics.md ("Level B").
+        """
+        return 1.0 + self.ec_dry_matter_slope_per_ms_cm * (self.ec_target_ms_cm - self.ec_dry_matter_reference_ms_cm)
+
+    @property
+    def ber_yield_loss_fraction(self) -> float:
+        """Level B2: EC/salinity-driven BER (Blossom End Rot) marketable-yield loss fraction."""
+        excess = max(0.0, self.ec_target_ms_cm - self.ec_ber_threshold_ms_cm)
+        return min(self.ber_yield_loss_fraction_max, self.ber_yield_loss_fraction_per_ms_cm_above_threshold * excess)
+
+    def _nutrient_penalty(self, value: float, min_optimal: float, max_optimal: float) -> float:
+        """Damped recipe tier: 0 inside [min_optimal, max_optimal], ramping linearly to
+        `damped_nutrient_penalty_cap_fraction` once `value` is a full range-width beyond
+        whichever boundary it's outside of, capped there.
+        """
+        if min_optimal <= value <= max_optimal:
+            return 0.0
+        range_width = max_optimal - min_optimal
+        distance = min_optimal - value if value < min_optimal else value - max_optimal
+        return min(self.damped_nutrient_penalty_cap_fraction, self.damped_nutrient_penalty_cap_fraction * distance / range_width)
+
+    @property
+    def recipe_adequacy_multiplier(self) -> float:
+        """Damped recipe tier: combined multiplicative yield effect of N/K/Mg/B, each
+        individually capped and the combination itself floored at
+        `recipe_adequacy_multiplier_min` so the tier can never swing yield unrealistically far.
+        """
+        combined = (
+            (1.0 - self._nutrient_penalty(self.n_ppm, self.n_min_optimal_ppm, self.n_max_optimal_ppm))
+            * (1.0 - self._nutrient_penalty(self.k_ppm, self.k_min_optimal_ppm, self.k_max_optimal_ppm))
+            * (1.0 - self._nutrient_penalty(self.mg_ppm, self.mg_min_optimal_ppm, self.mg_max_optimal_ppm))
+            * (1.0 - self._nutrient_penalty(self.b_ppm, self.b_min_optimal_ppm, self.b_max_optimal_ppm))
+        )
+        return max(self.recipe_adequacy_multiplier_min, combined)
 
 
 @dataclass
