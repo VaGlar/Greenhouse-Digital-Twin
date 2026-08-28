@@ -261,6 +261,24 @@ def test_marketable_yield_kg_m2_matches_hand_computed_formula():
     )
 
 
+def test_ec_target_override_above_ber_threshold_produces_yield_loss():
+    baseline = client.post("/simulate", json={"duration_days": 60}).json()["summary"]
+    assert baseline["ber_yield_loss_fraction"] == 0.0
+
+    high_ec = client.post("/simulate", json={"duration_days": 60, "ec_target_ms_cm": 4.5}).json()["summary"]
+    assert high_ec["ber_yield_loss_fraction"] > 0.0
+    assert high_ec["marketable_yield_kg_m2"] < baseline["marketable_yield_kg_m2"]
+
+
+def test_nutrient_ppm_override_out_of_range_reduces_recipe_adequacy():
+    baseline = client.post("/simulate", json={"duration_days": 60}).json()["summary"]
+    assert baseline["recipe_adequacy_multiplier"] == pytest.approx(1.0)
+
+    low_n = client.post("/simulate", json={"duration_days": 60, "n_ppm": 5.0}).json()["summary"]
+    assert low_n["recipe_adequacy_multiplier"] < 1.0
+    assert low_n["marketable_yield_kg_m2"] < baseline["marketable_yield_kg_m2"]
+
+
 def test_recirculation_electricity_is_bounded_by_its_fixed_fan_power():
     body = client.post("/simulate", json={"duration_days": 5}).json()
     summary = body["summary"]

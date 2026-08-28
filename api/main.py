@@ -107,6 +107,14 @@ class SimulateRequest(BaseModel):
     heating_setpoint_night_c: float | None = None
     co2_setpoint_day_ppm: float | None = None
     dehumidification_setpoint_pct: float | None = None
+    # Hydroponics recipe (see docs/assumptions/hydroponics.md "Level B" + damped recipe tier) --
+    # the only recipe fields with a real modeled effect, so the only ones exposed as overrides.
+    # pH and the informational tier (P/S/Fe/Mn/Zn/Cu/Mo) have no model effect, so aren't here.
+    ec_target_ms_cm: float | None = None
+    n_ppm: float | None = None
+    k_ppm: float | None = None
+    mg_ppm: float | None = None
+    b_ppm: float | None = None
 
 
 def _apply_overrides(raw: dict, overrides: SimulateRequest) -> dict:
@@ -128,6 +136,17 @@ def _apply_overrides(raw: dict, overrides: SimulateRequest) -> dict:
         climate["co2_setpoint_day_ppm"] = overrides.co2_setpoint_day_ppm
     if overrides.dehumidification_setpoint_pct is not None:
         climate["dehumidification_setpoint_pct"] = overrides.dehumidification_setpoint_pct
+    hydro = raw.setdefault("hydroponic", {})
+    if overrides.ec_target_ms_cm is not None:
+        hydro["ec_target_ms_cm"] = overrides.ec_target_ms_cm
+    if overrides.n_ppm is not None:
+        hydro["n_ppm"] = overrides.n_ppm
+    if overrides.k_ppm is not None:
+        hydro["k_ppm"] = overrides.k_ppm
+    if overrides.mg_ppm is not None:
+        hydro["mg_ppm"] = overrides.mg_ppm
+    if overrides.b_ppm is not None:
+        hydro["b_ppm"] = overrides.b_ppm
     return raw
 
 

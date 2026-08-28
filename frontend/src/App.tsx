@@ -48,7 +48,12 @@ type SliderKey =
   | "heating_setpoint_night_c"
   | "co2_setpoint_day_ppm"
   | "dehumidification_setpoint_pct"
-  | "duration_days";
+  | "duration_days"
+  | "ec_target_ms_cm"
+  | "n_ppm"
+  | "k_ppm"
+  | "mg_ppm"
+  | "b_ppm";
 
 interface SliderDef {
   key: SliderKey;
@@ -116,6 +121,62 @@ const WEATHER_SLIDERS: SliderDef[] = [
   { key: "duration_days", label: "Διάρκεια προσομοίωσης", unit: " μέρες", min: 30, max: 330, step: 10 },
 ];
 
+// Ranges/optimal bands filled in from /config once loaded (see the sufficiency ranges in
+// twin/params.py's HydroponicParams) -- these min/max/step are just slider mechanics, not
+// agronomic limits, so a somewhat generous span is fine.
+const RECIPE_SLIDERS: SliderDef[] = [
+  {
+    key: "ec_target_ms_cm",
+    label: "EC θρεπτικού διαλύματος",
+    unit: " mS/cm",
+    min: 1.5,
+    max: 6.0,
+    step: 0.1,
+    optimal: [2.0, 3.5],
+    note: "2.0-3.5 mS/cm εμπορικό στάνταρ. Πάνω από 3.5 (BER threshold) αυξάνεται ο κίνδυνος Blossom End Rot· η ξηρή ουσία καρπού (και άρα το μειωμένο νωπό βάρος) αυξάνει γραμμικά με το EC σε όλο το εύρος.",
+  },
+  {
+    key: "n_ppm",
+    label: "N (άζωτο)",
+    unit: " ppm",
+    min: 20,
+    max: 250,
+    step: 5,
+    optimal: [60, 150],
+    note: "Εκτός εύρους επάρκειας: μικρή, capped ποινή στο marketable yield.",
+  },
+  {
+    key: "k_ppm",
+    label: "K (κάλιο)",
+    unit: " ppm",
+    min: 50,
+    max: 550,
+    step: 10,
+    optimal: [199, 400],
+    note: "Εκτός εύρους επάρκειας: μικρή, capped ποινή στο marketable yield.",
+  },
+  {
+    key: "mg_ppm",
+    label: "Mg (μαγνήσιο)",
+    unit: " ppm",
+    min: 10,
+    max: 110,
+    step: 2,
+    optimal: [45, 70],
+    note: "Εκτός εύρους επάρκειας: μικρή, capped ποινή στο marketable yield.",
+  },
+  {
+    key: "b_ppm",
+    label: "B (βόριο)",
+    unit: " ppm",
+    min: 0.05,
+    max: 0.9,
+    step: 0.01,
+    optimal: [0.3, 0.5],
+    note: "Εκτός εύρους επάρκειας: μικρή, capped ποινή στο marketable yield.",
+  },
+];
+
 const DEFAULT_SLIDER_VALUES: Record<SliderKey, number> = {
   crop_density_plants_per_m2: 3.5,
   heating_setpoint_day_c: 20,
@@ -123,6 +184,11 @@ const DEFAULT_SLIDER_VALUES: Record<SliderKey, number> = {
   co2_setpoint_day_ppm: 900,
   dehumidification_setpoint_pct: 70,
   duration_days: 330,
+  ec_target_ms_cm: 3.0,
+  n_ppm: 105,
+  k_ppm: 300,
+  mg_ppm: 65,
+  b_ppm: 0.4,
 };
 
 function App() {
@@ -152,6 +218,11 @@ function App() {
           co2_setpoint_day_ppm: c.climate_control.co2_setpoint_day_ppm,
           dehumidification_setpoint_pct: c.climate_control.dehumidification_setpoint_pct,
           duration_days: c.simulation.duration_days,
+          ec_target_ms_cm: c.hydroponic.ec_target_ms_cm,
+          n_ppm: c.hydroponic.n_ppm,
+          k_ppm: c.hydroponic.k_ppm,
+          mg_ppm: c.hydroponic.mg_ppm,
+          b_ppm: c.hydroponic.b_ppm,
         });
         setCropVariety(c.crop.variety);
         setStartDate(c.simulation.start_date);
@@ -447,25 +518,22 @@ function App() {
 
             {activeTab === "recipe" && (
               <>
-                <p className="side-note">
-                  Το EC/pH του θρεπτικού διαλύματος <strong>τροφοδοτεί πραγματικά την
-                  προσομοίωση</strong> (νερό, ηλεκτρικό αντλίας, λίπασμα, και πλέον και το
-                  marketable yield μέσω EC→ξηρή ουσία καρπού και κινδύνου BER — δες παρακάτω). Το
-                  φορτίο καρπού/κλάδεμα (στελέχη/φυτό, καρποί/τσαμπί) βρίσκεται στο tab
-                  «Καλλιέργεια». Τα N/K/Mg/B παρακάτω έχουν <strong>πραγματικό αλλά σκόπιμα
-                  περιορισμένο (capped) effect</strong> στο marketable yield όταν βγαίνουν εκτός
-                  του εύρους επάρκειας. Τα υπόλοιπα στοιχεία (P/S/Fe/Mn/Zn/Cu/Mo) και η
-                  επικονίαση παραμένουν <strong>πληροφοριακά</strong> —{" "}
-                  <strong>δεν επηρεάζουν την προσομοίωση</strong>. Οι στόχοι κλίματος
-                  (θερμοκρασία, CO₂, αφύγρανση) βρίσκονται στο tab «Καιρός».
-                </p>
+                {RECIPE_SLIDERS.map((s) => (
+                  <ParamSlider
+                    key={s.key}
+                    label={s.label}
+                    unit={s.unit}
+                    min={s.min}
+                    max={s.max}
+                    step={s.step}
+                    optimal={s.optimal}
+                    note={s.note}
+                    value={sliderValues[s.key]}
+                    onChange={(v) => setSlider(s.key, v)}
+                  />
+                ))}
                 {config && (
                   <dl className="spec-list">
-                    <div className="spec-section-label">Λίπανση</div>
-                    <div className="spec-row">
-                      <dt>EC θρεπτικού διαλύματος</dt>
-                      <dd>{config.hydroponic.ec_target_ms_cm.toFixed(1)} mS/cm</dd>
-                    </div>
                     <div className="spec-row">
                       <dt>pH θρεπτικού διαλύματος</dt>
                       <dd>{config.hydroponic.ph_target.toFixed(1)}</dd>
@@ -474,85 +542,27 @@ function App() {
                 )}
                 {config && (
                   <dl className="spec-list">
-                    <div className="spec-section-label">Θρεπτικά (N/K/Mg/B) — έχουν πραγματικό effect</div>
+                    <div className="spec-section-label">Λοιπά στοιχεία, επικονίαση — πληροφοριακά, χωρίς effect</div>
                     <div className="spec-row">
-                      <dt>N</dt>
+                      <dt>P / S / Fe</dt>
                       <dd>
-                        {config.hydroponic.n_ppm.toFixed(0)} ppm (επάρκεια{" "}
-                        {config.hydroponic.n_min_optimal_ppm.toFixed(0)}–
-                        {config.hydroponic.n_max_optimal_ppm.toFixed(0)})
+                        {config.hydroponic.p_ppm.toFixed(0)} / {config.hydroponic.s_ppm.toFixed(0)} /{" "}
+                        {config.hydroponic.fe_ppm.toFixed(2)} ppm
                       </dd>
                     </div>
                     <div className="spec-row">
-                      <dt>K</dt>
+                      <dt>Mn / Zn / Cu / Mo</dt>
                       <dd>
-                        {config.hydroponic.k_ppm.toFixed(0)} ppm (επάρκεια{" "}
-                        {config.hydroponic.k_min_optimal_ppm.toFixed(0)}–
-                        {config.hydroponic.k_max_optimal_ppm.toFixed(0)})
+                        {config.hydroponic.mn_ppm.toFixed(2)} / {config.hydroponic.zn_ppm.toFixed(2)} /{" "}
+                        {config.hydroponic.cu_ppm.toFixed(2)} / {config.hydroponic.mo_ppm.toFixed(2)} ppm
                       </dd>
                     </div>
                     <div className="spec-row">
-                      <dt>Mg</dt>
-                      <dd>
-                        {config.hydroponic.mg_ppm.toFixed(0)} ppm (επάρκεια{" "}
-                        {config.hydroponic.mg_min_optimal_ppm.toFixed(0)}–
-                        {config.hydroponic.mg_max_optimal_ppm.toFixed(0)})
-                      </dd>
-                    </div>
-                    <div className="spec-row">
-                      <dt>B</dt>
-                      <dd>
-                        {config.hydroponic.b_ppm.toFixed(2)} ppm (επάρκεια{" "}
-                        {config.hydroponic.b_min_optimal_ppm.toFixed(2)}–
-                        {config.hydroponic.b_max_optimal_ppm.toFixed(2)})
-                      </dd>
+                      <dt>Επικονίαση</dt>
+                      <dd>Bombus terrestris, ~1/500–1.000 m²</dd>
                     </div>
                   </dl>
                 )}
-                {config && (
-                  <dl className="spec-list">
-                    <div className="spec-section-label">Λοιπά στοιχεία — πληροφοριακά</div>
-                    <div className="spec-row">
-                      <dt>P</dt>
-                      <dd>{config.hydroponic.p_ppm.toFixed(0)} ppm</dd>
-                    </div>
-                    <div className="spec-row">
-                      <dt>S</dt>
-                      <dd>{config.hydroponic.s_ppm.toFixed(0)} ppm</dd>
-                    </div>
-                    <div className="spec-row">
-                      <dt>Fe</dt>
-                      <dd>{config.hydroponic.fe_ppm.toFixed(2)} ppm</dd>
-                    </div>
-                    <div className="spec-row">
-                      <dt>Mn</dt>
-                      <dd>{config.hydroponic.mn_ppm.toFixed(2)} ppm</dd>
-                    </div>
-                    <div className="spec-row">
-                      <dt>Zn</dt>
-                      <dd>{config.hydroponic.zn_ppm.toFixed(2)} ppm</dd>
-                    </div>
-                    <div className="spec-row">
-                      <dt>Cu</dt>
-                      <dd>{config.hydroponic.cu_ppm.toFixed(2)} ppm</dd>
-                    </div>
-                    <div className="spec-row">
-                      <dt>Mo</dt>
-                      <dd>{config.hydroponic.mo_ppm.toFixed(2)} ppm</dd>
-                    </div>
-                  </dl>
-                )}
-                <dl className="spec-list">
-                  <div className="spec-section-label">Επικονίαση — πληροφοριακή</div>
-                  <div className="spec-row">
-                    <dt>Μέθοδος</dt>
-                    <dd>Κυψέλες Bombus terrestris</dd>
-                  </div>
-                  <div className="spec-row">
-                    <dt>Πυκνότητα κυψελών</dt>
-                    <dd>~1 / 500–1.000 m²</dd>
-                  </div>
-                </dl>
               </>
             )}
 
