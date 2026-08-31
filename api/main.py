@@ -294,6 +294,14 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
     # damped N/K/Mg/B recipe tier. All applied as post-hoc scalar adjustments to
     # final_yield_kg_m2, not inside the crop model's hourly loop (EC/pH/recipe are static config
     # values for the whole run in this design).
+    # NAMING CAVEAT (flagged by the user 2026-08-29, not yet resolved): "marketable" strictly
+    # means output that passes quality control and can be sold. Of the four factors combined
+    # below, only ber_yield_loss_fraction is actually that (BER is a real fruit defect that gets
+    # a fruit rejected) -- the other three (B1 dry-matter, ph_availability_multiplier,
+    # recipe_adequacy_multiplier) are changes to the plant's *total biological* yield (it grows
+    # less), not produce that grew normally and then got culled. Left as one combined
+    # "marketable_yield_kg_m2" number for now (explicit user decision) -- revisit before treating
+    # this as an economically meaningful "sellable" figure. See docs/assumptions/hydroponics.md.
     hydro = params.hydroponic
     ec_adjusted_final_yield_kg_m2 = final_yield_kg_m2 / hydro.effective_dry_matter_content_fruit
     ber_yield_loss_fraction = hydro.ber_yield_loss_fraction
