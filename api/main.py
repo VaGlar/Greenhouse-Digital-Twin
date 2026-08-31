@@ -183,6 +183,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "rh_in_pct": "mean",
                 "vpd_kpa": "mean",
                 "fruit_fresh_yield_kg_m2": "last",
+                "climate_phase": "last",  # unchanged within a day (day-granularity phase boundary)
                 # Daily-average power draw (kW), i.e. normalized per hour — not a daily total —
                 # so it's directly comparable to the CHP's fixed max heat output below.
                 "heat_used_kw": "mean",
@@ -361,6 +362,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
         "daily_series": [
             {
                 "date": row.timestamp.date().isoformat(),
+                "climate_phase": row.climate_phase,
                 "temp_in_c": round(row.temp_in_c, 2),
                 "temp_out_c": round(row.temp_out_c, 2),
                 "co2_in_ppm": round(row.co2_in_ppm, 1),

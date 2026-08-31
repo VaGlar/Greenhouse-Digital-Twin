@@ -114,6 +114,7 @@ def test_simulate_daily_series_rows_have_expected_fields():
         "drainage_water_l_day",
         "fertilizer_dosed_g_day",
         "fruit_set_pct",
+        "climate_phase",
     ):
         assert key in row
 
@@ -128,6 +129,53 @@ def test_simulate_heating_setpoint_override_changes_indoor_temperature():
     cold_mean_temp = sum(r["temp_in_c"] for r in cold["daily_series"]) / len(cold["daily_series"])
     warm_mean_temp = sum(r["temp_in_c"] for r in warm["daily_series"]) / len(warm["daily_series"])
     assert warm_mean_temp > cold_mean_temp
+
+
+# -- phase-aware climate control, temperature (docs/plans/2026-08-31-phase-aware-climate-design.md) --
+
+
+def test_climate_phase_transitions_across_the_season_at_the_expected_boundaries():
+    config = client.get("/config").json()
+    fruiting_start_days = config["crop"]["fruiting_start_days"]
+    fruiting_ramp_days = config["crop"]["fruiting_ramp_days"]
+
+    body = client.post("/simulate", json={"duration_days": 70}).json()
+    phases = [row["climate_phase"] for row in body["daily_series"]]
+
+    assert phases[0] == "vegetative"
+    assert phases[-1] == "full_fruiting"
+    assert "ramp_up" in phases
+
+    # Monotonic: vegetative -> ramp_up -> full_fruiting, never backwards.
+    order = {"vegetative": 0, "ramp_up": 1, "full_fruiting": 2}
+    ranks = [order[p] for p in phases]
+    assert ranks == sorted(ranks)
+
+    # Transition days roughly match the configured boundary (daily_series[i] is day i,
+    # 0-indexed; days_after_planting driving that day's climate decision is ~i).
+    first_ramp_up_day = phases.index("ramp_up")
+    first_full_fruiting_day = phases.index("full_fruiting")
+    assert abs(first_ramp_up_day - fruiting_start_days) <= 1
+    assert abs(first_full_fruiting_day - (fruiting_start_days + fruiting_ramp_days)) <= 1
+
+
+def test_heating_setpoint_override_warms_every_climate_phase():
+    # One override shifts the vegetative baseline -- since ramp_up/full_fruiting are defined
+    # relative to it, every phase present in the run should end up warmer, not just vegetative.
+    cold = client.post(
+        "/simulate", json={"duration_days": 70, "heating_setpoint_day_c": 15, "heating_setpoint_night_c": 12}
+    ).json()
+    warm = client.post(
+        "/simulate", json={"duration_days": 70, "heating_setpoint_day_c": 25, "heating_setpoint_night_c": 22}
+    ).json()
+
+    def mean_temp_for_phase(result: dict, phase: str) -> float:
+        rows = [r["temp_in_c"] for r in result["daily_series"] if r["climate_phase"] == phase]
+        assert rows, f"no {phase} days in this run"
+        return sum(rows) / len(rows)
+
+    for phase in ("vegetative", "ramp_up", "full_fruiting"):
+        assert mean_temp_for_phase(warm, phase) > mean_temp_for_phase(cold, phase)
 
 
 # -- invalid overrides: twin/params.py validation must surface as a 422, not a 500 --

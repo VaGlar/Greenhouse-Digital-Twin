@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from twin.climate_model import ClimateState, GreenhouseClimateModel
-from twin.crop_model import CropState, TomatoCropModel
+from twin.crop_model import CropState, TomatoCropModel, crop_growth_phase
 from twin.params import GreenhouseParams
 from twin.weather import load_weather
 
@@ -33,6 +33,11 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
     for _, row in weather_df.iterrows():
         hour = row["timestamp"].hour
 
+        # Phase-aware climate control (see docs/plans/2026-08-31-phase-aware-climate-design.md):
+        # computed from the crop state as of the start of this hour (before crop_model.step()
+        # advances it below), same ordering as the existing temp_in_c/co2_in_ppm reads.
+        phase = crop_growth_phase(crop_state.days_after_planting, params.crop)
+
         # Decided once per hour and fed to both models, so the crop's shaded light and the
         # climate model's energy balance always agree on whether the screen is deployed.
         screen_deployed = climate_model.decide_screen_deployment(
@@ -41,6 +46,7 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
             temp_out_c=row["temp_out_c"],
             solar_rad_w_m2=row["solar_rad_w_m2"],
             dt_hours=dt_hours,
+            phase=phase,
             rh_out_pct=row["rh_out_pct"],
         )
         shaded_solar_rad_w_m2 = row["solar_rad_w_m2"] * (
@@ -64,6 +70,7 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
             temp_out_c=row["temp_out_c"],
             solar_rad_w_m2=row["solar_rad_w_m2"],
             dt_hours=dt_hours,
+            phase=phase,
             co2_uptake_kg_per_hour=co2_uptake_kg_per_hour,
             rh_out_pct=row["rh_out_pct"],
             transpiration_kg_per_hour=transpiration_kg_per_hour,
@@ -135,6 +142,7 @@ def run_simulation(params: GreenhouseParams) -> pd.DataFrame:
                 "vpd_kpa": climate_result.vpd_kpa,
                 "condensed_kg": climate_result.condensed_kg,
                 "dehumidified_kg": climate_result.dehumidified_kg,
+                "climate_phase": phase.value,
                 "days_after_planting": crop_state.days_after_planting,
                 "leaf_area_index": crop_state.leaf_area_index,
                 "standing_dry_matter_g_m2": crop_state.standing_dry_matter_g_m2,

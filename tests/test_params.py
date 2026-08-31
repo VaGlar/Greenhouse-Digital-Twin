@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from twin.params import ClimateControlParams, HydroponicParams
+from twin.params import ClimateControlParams, ClimatePhase, HydroponicParams
 
 
 def _params(**overrides):
@@ -40,6 +40,50 @@ def test_rejects_co2_day_setpoint_below_ambient():
 
 def test_accepts_co2_day_setpoint_equal_to_ambient():
     _params(co2_setpoint_day_ppm=420.0, co2_ambient_ppm=420.0)
+
+
+# -- Phase-aware climate control, temperature (docs/plans/2026-08-31-phase-aware-climate-design.md) --
+
+
+def test_heating_setpoint_ignores_deltas_during_vegetative_phase():
+    params = _params(
+        ramp_up_heating_setpoint_day_delta_c=5.0,
+        ramp_up_heating_setpoint_night_delta_c=5.0,
+        full_fruiting_heating_setpoint_day_delta_c=5.0,
+        full_fruiting_heating_setpoint_night_delta_c=5.0,
+    )
+    assert params.heating_setpoint(hour=12, phase=ClimatePhase.VEGETATIVE) == 20.0
+    assert params.heating_setpoint(hour=2, phase=ClimatePhase.VEGETATIVE) == 17.0
+
+
+def test_heating_setpoint_applies_ramp_up_delta():
+    params = _params(
+        ramp_up_heating_setpoint_day_delta_c=1.5,
+        ramp_up_heating_setpoint_night_delta_c=-0.5,
+    )
+    assert params.heating_setpoint(hour=12, phase=ClimatePhase.RAMP_UP) == pytest.approx(21.5)
+    assert params.heating_setpoint(hour=2, phase=ClimatePhase.RAMP_UP) == pytest.approx(16.5)
+
+
+def test_heating_setpoint_applies_full_fruiting_delta():
+    params = _params(
+        full_fruiting_heating_setpoint_day_delta_c=2.0,
+        full_fruiting_heating_setpoint_night_delta_c=2.0,
+    )
+    assert params.heating_setpoint(hour=12, phase=ClimatePhase.FULL_FRUITING) == pytest.approx(22.0)
+    assert params.heating_setpoint(hour=2, phase=ClimatePhase.FULL_FRUITING) == pytest.approx(19.0)
+
+
+def test_overriding_baseline_shifts_every_phase_equally():
+    # The whole point of the baseline+delta design: one override changes the vegetative baseline,
+    # which shifts ramp_up/full_fruiting targets by the same amount since they're defined
+    # relative to it -- no separate per-phase overrides needed.
+    base = _params(full_fruiting_heating_setpoint_day_delta_c=2.0)
+    warmer = _params(heating_setpoint_day_c=25.0, full_fruiting_heating_setpoint_day_delta_c=2.0)
+
+    base_full = base.heating_setpoint(hour=12, phase=ClimatePhase.FULL_FRUITING)
+    warmer_full = warmer.heating_setpoint(hour=12, phase=ClimatePhase.FULL_FRUITING)
+    assert warmer_full - base_full == pytest.approx(25.0 - 20.0)
 
 
 # -- HydroponicParams (hydroponics.md Level A) --

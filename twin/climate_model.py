@@ -44,7 +44,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from twin.params import CHPParams, ClimateControlParams, GeometryParams
+from twin.params import CHPParams, ClimateControlParams, ClimatePhase, GeometryParams
 
 AIR_VOLUMETRIC_HEAT_CAPACITY_J_M3K = 1_200.0  # ~ air density (1.2 kg/m3) x specific heat (1005 J/kgK)
 CO2_DENSITY_KG_M3 = 1.83  # density of CO2 gas at ~20C, used only to convert mass <-> ppm
@@ -176,6 +176,7 @@ class GreenhouseClimateModel:
         temp_out_c: float,
         solar_rad_w_m2: float,
         dt_hours: float,
+        phase: ClimatePhase,
         rh_out_pct: float = 60.0,
     ) -> bool:
         """Decide deploy/retract for this hour, before the screen's own effect is applied to
@@ -187,7 +188,7 @@ class GreenhouseClimateModel:
 
         dt_s = dt_hours * 3600.0
         c_total = self._thermal_capacity_j_k
-        setpoint = self.control.heating_setpoint(hour)
+        setpoint = self.control.heating_setpoint(hour, phase)
         vent_setpoint = setpoint + self.control.vent_temp_margin_c
         q_solar_w_full = solar_rad_w_m2 * self.geometry.area_m2 * self.geometry.cover_transmissivity
         q_trans_loss_w_full = self.geometry.cover_u_value_w_m2k * self.geometry.cover_area_m2 * (
@@ -230,6 +231,7 @@ class GreenhouseClimateModel:
         temp_out_c: float,
         solar_rad_w_m2: float,
         dt_hours: float,
+        phase: ClimatePhase,
         co2_uptake_kg_per_hour: float = 0.0,
         rh_out_pct: float = 60.0,
         transpiration_kg_per_hour: float = 0.0,
@@ -239,14 +241,14 @@ class GreenhouseClimateModel:
         c_total = self._thermal_capacity_j_k
 
         # --- Energy balance: solar gain vs. transmission loss ---
-        setpoint = self.control.heating_setpoint(hour)
+        setpoint = self.control.heating_setpoint(hour, phase)
         vent_setpoint = setpoint + self.control.vent_temp_margin_c
         q_solar_w_full = solar_rad_w_m2 * self.geometry.area_m2 * self.geometry.cover_transmissivity
         q_trans_loss_w_full = self.geometry.cover_u_value_w_m2k * self.geometry.cover_area_m2 * (
             state.temp_in_c - temp_out_c
         )
         if screen_deployed is None:
-            screen_deployed = self.decide_screen_deployment(state, hour, temp_out_c, solar_rad_w_m2, dt_hours)
+            screen_deployed = self.decide_screen_deployment(state, hour, temp_out_c, solar_rad_w_m2, dt_hours, phase)
         # Thermal screen: same fabric provides both effects whenever deployed -- cuts
         # transmission heat loss AND solar gain by its rated fraction (see module docstring).
         if screen_deployed:

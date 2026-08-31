@@ -10,8 +10,9 @@ from twin.crop_model import (
     _lai,
     _temperature_response,
     _vpd_response,
+    crop_growth_phase,
 )
-from twin.params import CropParams
+from twin.params import ClimatePhase, CropParams
 
 
 def _crop_params(**overrides) -> CropParams:
@@ -22,6 +23,19 @@ def _crop_params(**overrides) -> CropParams:
     )
     defaults.update(overrides)
     return CropParams(**defaults)
+
+
+# -- crop_growth_phase (docs/plans/2026-08-31-phase-aware-climate-design.md) --
+
+
+def test_crop_growth_phase_boundaries():
+    params = _crop_params(fruiting_start_days=35.0, fruiting_ramp_days=20.0)
+    assert crop_growth_phase(0.0, params) is ClimatePhase.VEGETATIVE
+    assert crop_growth_phase(34.9, params) is ClimatePhase.VEGETATIVE
+    assert crop_growth_phase(35.0, params) is ClimatePhase.RAMP_UP
+    assert crop_growth_phase(54.9, params) is ClimatePhase.RAMP_UP
+    assert crop_growth_phase(55.0, params) is ClimatePhase.FULL_FRUITING
+    assert crop_growth_phase(300.0, params) is ClimatePhase.FULL_FRUITING
 
 
 def test_rejects_invalid_stems_per_plant():

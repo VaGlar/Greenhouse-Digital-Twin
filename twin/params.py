@@ -10,9 +10,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from enum import Enum
 from pathlib import Path
 
 import yaml
+
+
+class ClimatePhase(Enum):
+    """Crop growth phase used to make climate_control setpoints phase-aware (see
+    docs/plans/2026-08-31-phase-aware-climate-design.md). Boundaries are derived from
+    CropParams.fruiting_start_days/fruiting_ramp_days (twin/crop_model.py's crop_growth_phase())
+    -- not a second, independently-configured phase schedule.
+    """
+
+    VEGETATIVE = "vegetative"
+    RAMP_UP = "ramp_up"
+    FULL_FRUITING = "full_fruiting"
 
 
 @dataclass
@@ -76,6 +89,9 @@ class CHPParams:
 
 @dataclass
 class ClimateControlParams:
+    # These two are the VEGETATIVE-phase target (see the phase-delta fields below) -- previously
+    # the single flat setpoint for the whole season, before phase-aware climate control
+    # (2026-08-31, see docs/plans/2026-08-31-phase-aware-climate-design.md).
     heating_setpoint_day_c: float
     heating_setpoint_night_c: float
     day_start_hour: int = 6
@@ -172,6 +188,18 @@ class ClimateControlParams:
     # lower static pressure) ~= 4.7 kW total when running. Not a real fan count/spec for
     # this installation. See docs/papers/greenhouse-electricity-consumption.md.
     recirculation_fan_power_kw: float = 4.7
+    # -- Phase-aware climate control, temperature only (2026-08-31, first pass -- see
+    # docs/plans/2026-08-31-phase-aware-climate-design.md). heating_setpoint_day_c/night_c above
+    # are the vegetative-phase target; each later phase's actual target is that baseline plus its
+    # own delta here. SOURCED: general greenhouse-tomato grower guidance repeatedly cites the
+    # flowering/fruit-set/full-fruiting period as running ~2C warmer (both day and night) than
+    # the vegetative stage -- ramp_up (the fruit-set ramp itself) gets the same delta as
+    # full_fruiting since the cited guidance doesn't distinguish a separate intermediate target
+    # for that window. See docs/assumptions/climate-control.md.
+    ramp_up_heating_setpoint_day_delta_c: float = 2.0
+    ramp_up_heating_setpoint_night_delta_c: float = 2.0
+    full_fruiting_heating_setpoint_day_delta_c: float = 2.0
+    full_fruiting_heating_setpoint_night_delta_c: float = 2.0
 
     def __post_init__(self) -> None:
         if not 0 <= self.day_start_hour < 24 or not 0 <= self.day_end_hour <= 24:
@@ -210,8 +238,19 @@ class ClimateControlParams:
     def is_daytime(self, hour: int) -> bool:
         return self.day_start_hour <= hour < self.day_end_hour
 
-    def heating_setpoint(self, hour: int) -> float:
-        return self.heating_setpoint_day_c if self.is_daytime(hour) else self.heating_setpoint_night_c
+    def heating_setpoint(self, hour: int, phase: ClimatePhase) -> float:
+        base = self.heating_setpoint_day_c if self.is_daytime(hour) else self.heating_setpoint_night_c
+        if phase is ClimatePhase.VEGETATIVE:
+            return base
+        if phase is ClimatePhase.RAMP_UP:
+            delta = self.ramp_up_heating_setpoint_day_delta_c if self.is_daytime(hour) else self.ramp_up_heating_setpoint_night_delta_c
+        else:
+            delta = (
+                self.full_fruiting_heating_setpoint_day_delta_c
+                if self.is_daytime(hour)
+                else self.full_fruiting_heating_setpoint_night_delta_c
+            )
+        return base + delta
 
 
 @dataclass
