@@ -1,6 +1,7 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 
 import pandas as pd
+import pytest
 
 from twin.params import WeatherParams
 from twin.weather import load_weather
@@ -11,6 +12,20 @@ def _write_template(tmp_path, rows):
     pd.DataFrame(rows, columns=["month", "day", "hour", "temp_out_c", "solar_rad_w_m2", "rh_out_pct"]).to_csv(
         path, index=False
     )
+    return str(path)
+
+
+def _write_exact_date_csv(tmp_path, start, hours, temp_out_c=15.0, solar_rad_w_m2=200.0, rh_out_pct=60.0):
+    path = tmp_path / "historical.csv"
+    timestamps = [start + timedelta(hours=h) for h in range(hours)]
+    pd.DataFrame(
+        {
+            "timestamp": timestamps,
+            "temp_out_c": [temp_out_c] * hours,
+            "solar_rad_w_m2": [solar_rad_w_m2] * hours,
+            "rh_out_pct": [rh_out_pct] * hours,
+        }
+    ).to_csv(path, index=False)
     return str(path)
 
 
@@ -51,3 +66,73 @@ def test_csv_typical_year_falls_back_to_feb_28_when_feb_29_is_missing(tmp_path):
 
     assert len(df) == 24
     assert (df["temp_out_c"] == 10.0).all()
+
+
+# -- "csv": exact-date historical weather --
+
+
+def test_csv_exact_date_returns_only_rows_within_the_requested_window(tmp_path):
+    csv_path = _write_exact_date_csv(tmp_path, datetime(2026, 1, 1), hours=24 * 5)
+    params = WeatherParams(source="csv", csv_path=csv_path)
+
+    df = load_weather(params, start_date=date(2026, 1, 2), duration_days=2, timestep_hours=1.0)
+
+    assert len(df) == 48
+    assert df["timestamp"].min() == datetime(2026, 1, 2)
+    assert df["timestamp"].max() == datetime(2026, 1, 3, 23)
+
+
+def test_csv_requires_csv_path():
+    params = WeatherParams(source="csv", csv_path=None)
+    with pytest.raises(ValueError, match="csv_path"):
+        load_weather(params, start_date=date(2026, 1, 1), duration_days=1, timestep_hours=1.0)
+
+
+def test_csv_rejects_missing_required_columns(tmp_path):
+    path = tmp_path / "bad.csv"
+    pd.DataFrame({"timestamp": [datetime(2026, 1, 1)], "temp_out_c": [10.0]}).to_csv(path, index=False)
+    params = WeatherParams(source="csv", csv_path=str(path))
+
+    with pytest.raises(ValueError, match="missing required columns"):
+        load_weather(params, start_date=date(2026, 1, 1), duration_days=1, timestep_hours=1.0)
+
+
+def test_csv_raises_when_no_rows_cover_the_requested_window(tmp_path):
+    csv_path = _write_exact_date_csv(tmp_path, datetime(2026, 1, 1), hours=24)
+    params = WeatherParams(source="csv", csv_path=csv_path)
+
+    with pytest.raises(ValueError, match="no rows covering"):
+        load_weather(params, start_date=date(2030, 1, 1), duration_days=1, timestep_hours=1.0)
+
+
+# -- "synthetic": sinusoidal seasonal/diurnal generator (fallback with no real weather data) --
+
+
+def test_synthetic_produces_one_row_per_hour():
+    params = WeatherParams(source="synthetic")
+    df = load_weather(params, start_date=date(2026, 3, 1), duration_days=3, timestep_hours=1.0)
+    assert len(df) == 3 * 24
+
+
+def test_synthetic_solar_radiation_is_zero_at_midnight_and_positive_at_midday():
+    params = WeatherParams(source="synthetic", peak_solar_w_m2=800.0)
+    df = load_weather(params, start_date=date(2026, 6, 21), duration_days=1, timestep_hours=1.0)
+    assert df.iloc[0]["solar_rad_w_m2"] == 0.0  # hour 0 (midnight)
+    assert df.iloc[13]["solar_rad_w_m2"] > 0.0  # hour 13, near the ~14:00 peak
+    assert (df["solar_rad_w_m2"] >= 0.0).all()
+
+
+def test_synthetic_summer_is_warmer_than_winter_at_the_same_hour():
+    params = WeatherParams(source="synthetic", mean_annual_temp_c=15.0, seasonal_amplitude_c=10.0, diurnal_amplitude_c=0.0)
+    summer = load_weather(params, start_date=date(2026, 6, 21), duration_days=1, timestep_hours=1.0)
+    winter = load_weather(params, start_date=date(2026, 12, 21), duration_days=1, timestep_hours=1.0)
+    assert summer.iloc[12]["temp_out_c"] > winter.iloc[12]["temp_out_c"]
+
+
+# -- dispatch --
+
+
+def test_load_weather_rejects_unknown_source():
+    params = WeatherParams(source="not-a-real-source")
+    with pytest.raises(ValueError, match="Unknown weather source"):
+        load_weather(params, start_date=date(2026, 1, 1), duration_days=1, timestep_hours=1.0)
