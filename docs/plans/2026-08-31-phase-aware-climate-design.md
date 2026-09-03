@@ -75,9 +75,11 @@ by special-casing the override logic.
 ## API / frontend
 
 - `daily_series` gains a `climate_phase` string field (`"vegetative"` / `"ramp_up"` /
-  `"full_fruiting"`) — informational, derived the same way as other reporting-layer fields, for a
-  possible future chart annotation or phase badge. No UI consumes it yet in this pass (see "Out
-  of scope").
+  `"full_fruiting"`) — informational, derived the same way as other reporting-layer fields.
+  **Update (same day, user follow-up)**: surfaced as a small badge in the `DayScrubber` next to
+  the viewed day's date, so the viewed phase is visible without cross-referencing the config —
+  this was originally scoped as "no UI yet", but doing it turned out to be a few-line addition
+  once the field already existed, so it shipped in the same pass instead of staying deferred.
 - No changes to `SimulateRequest`, `_apply_overrides`, or any frontend slider — see "Setpoint
   design" above for why.
 

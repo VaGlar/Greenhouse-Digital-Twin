@@ -551,6 +551,16 @@ body {
   font-weight: 500;
 }
 
+.day-scrubber-phase {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--series-3);
+  background: color-mix(in srgb, var(--series-3) 12%, transparent);
+  border-radius: 2px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 .day-scrubber-range {
   width: 100%;
   accent-color: var(--amber);

@@ -17,7 +17,20 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from twin.params import CropParams
+from twin.params import ClimatePhase, CropParams
+
+
+def crop_growth_phase(days_after_planting: float, params: CropParams) -> ClimatePhase:
+    """Which phase-aware-climate-control phase this hour falls in -- reuses the same
+    fruiting_start_days/fruiting_ramp_days boundary the fruit-partition ramp below already uses,
+    not a second, independently-configured phase schedule. See
+    docs/plans/2026-08-31-phase-aware-climate-design.md.
+    """
+    if days_after_planting < params.fruiting_start_days:
+        return ClimatePhase.VEGETATIVE
+    if days_after_planting < params.fruiting_start_days + params.fruiting_ramp_days:
+        return ClimatePhase.RAMP_UP
+    return ClimatePhase.FULL_FRUITING
 
 CO2_MOLAR_MASS_G_MOL = 44.0
 CH2O_MOLAR_MASS_G_MOL = 30.0

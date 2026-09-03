@@ -983,6 +983,22 @@ function App() {
   );
 }
 
+/** Phase-aware climate control (docs/plans/2026-08-31-phase-aware-climate-design.md):
+ * DailyPoint.climate_phase's raw values ("vegetative" | "ramp_up" | "full_fruiting") to a
+ * short Greek label for the day-scrubber badge. */
+function climatePhaseLabel(phase: string): string {
+  switch (phase) {
+    case "vegetative":
+      return "🌱 Βλαστική";
+    case "ramp_up":
+      return "🌼 Έναρξη καρποφορίας";
+    case "full_fruiting":
+      return "🍅 Πλήρης καρποφορία";
+    default:
+      return phase;
+  }
+}
+
 /** Lets the user "step forward" through an already-completed run's simulated days --
  * useful now for inspecting an earlier point in the season (the schematic, gauges,
  * and every ComparableChart's reference-line marker all follow the viewed day), and
@@ -1001,6 +1017,7 @@ function DayScrubber({
 }) {
   const maxIdx = daily.length - 1;
   const viewedDate = daily[viewedIndex]?.date;
+  const viewedPhase = daily[viewedIndex]?.climate_phase;
   const presetDays = [10, 20, 50, 100, 200].filter((d) => d <= maxIdx + 1);
 
   return (
@@ -1011,6 +1028,7 @@ function DayScrubber({
           {viewedDate ? ` · ${viewedDate}` : ""}
           {isLive && <span className="day-scrubber-live"> · τρέχουσα</span>}
         </span>
+        {viewedPhase && <span className="day-scrubber-phase">{climatePhaseLabel(viewedPhase)}</span>}
         {!isLive && (
           <button className="secondary-button" onClick={() => onChange(null)}>
             ⏭ Μετάβαση στο τέλος

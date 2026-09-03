@@ -62,6 +62,19 @@ climate_control:
                                      # not a real fan count) x specific fan power, see
                                      # docs/assumptions/economics.md
 
+  # Phase-aware climate control, temperature only (2026-08-31, first pass). heating_setpoint_
+  # day_c/night_c above are now explicitly the VEGETATIVE-phase target; each later phase's real
+  # target = that baseline + its delta here. SOURCED: general greenhouse-tomato grower guidance
+  # repeatedly cites the flowering/fruit-set/full-fruiting period as running ~2C warmer (both
+  # day and night) than the vegetative stage. ramp_up (the fruit-set ramp itself) gets the same
+  # delta as full_fruiting, since the cited guidance doesn't distinguish a separate intermediate
+  # target for that window. See docs/assumptions/climate-control.md,
+  # docs/plans/2026-08-31-phase-aware-climate-design.md.
+  ramp_up_heating_setpoint_day_delta_c: 2.0
+  ramp_up_heating_setpoint_night_delta_c: 2.0
+  full_fruiting_heating_setpoint_day_delta_c: 2.0
+  full_fruiting_heating_setpoint_night_delta_c: 2.0
+
 crop:
   variety: "Beef tomato (EYRE RZ F1-class, ~230-280g)"  # PLACEHOLDER: chosen after checking
                                     # regional fit, market demand, and a real Northern Greece

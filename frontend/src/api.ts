@@ -84,6 +84,13 @@ export interface GreenhouseConfig {
     dehumidification_setpoint_pct: number;
     fan_pad_cooling_enabled: boolean;
     recirculation_fan_power_kw: number;
+    /** Phase-aware climate control, temperature only (docs/plans/2026-08-31-phase-aware-climate-design.md).
+     * heating_setpoint_day_c/night_c above are the vegetative-phase target; these are each later
+     * phase's delta from that baseline. Not yet surfaced as separate UI controls. */
+    ramp_up_heating_setpoint_day_delta_c: number;
+    ramp_up_heating_setpoint_night_delta_c: number;
+    full_fruiting_heating_setpoint_day_delta_c: number;
+    full_fruiting_heating_setpoint_night_delta_c: number;
     [key: string]: unknown;
   };
   weather: { source: string; latitude_deg: number; [key: string]: unknown };
@@ -92,6 +99,10 @@ export interface GreenhouseConfig {
 
 export interface DailyPoint {
   date: string;
+  /** Phase-aware climate control (docs/plans/2026-08-31-phase-aware-climate-design.md): which
+   * crop growth phase this day falls in -- "vegetative" | "ramp_up" | "full_fruiting", derived
+   * from CropParams.fruiting_start_days/fruiting_ramp_days. Informational only in this pass. */
+  climate_phase: string;
   temp_in_c: number;
   temp_out_c: number;
   /** Daytime-only average (day_start_hour-day_end_hour) — the CO2 dosing target only applies

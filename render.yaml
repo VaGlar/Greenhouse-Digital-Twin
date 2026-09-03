@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: greenhouse-digital-twin-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.15
+      # Set this to the deployed frontend's URL (e.g. https://greenhouse-digital-twin.vercel.app)
+      # once it exists, so the browser's CORS check allows it -- *.vercel.app preview URLs are
+      # already allowed automatically (see api/main.py), this is only needed for a custom domain
+      # or to be explicit about the production one. Comma-separate multiple origins.
+      - key: FRONTEND_ORIGINS
+        sync: false
+    healthCheckPath: /health

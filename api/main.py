@@ -8,6 +8,7 @@ edits per run. The frontend only triggers a simulation and reads results.
 from __future__ import annotations
 
 import copy
+import os
 from datetime import date
 from pathlib import Path
 
@@ -27,11 +28,18 @@ DEFAULT_CONFIG_PATH = REPO_ROOT / "config" / "greenhouse_example.yaml"
 
 app = FastAPI(title="Greenhouse Digital Twin API")
 
+# Deployed frontend origin (e.g. https://greenhouse-digital-twin.vercel.app), set as an env var
+# on the backend host -- not known at code-time, so it isn't hardcoded like the local dev
+# origins below. Comma-separated so a custom domain can be added alongside the *.vercel.app one.
+_extra_origins = [o.strip() for o in os.environ.get("FRONTEND_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    # Codespaces/Gitpod-style forwarded preview URLs (e.g. https://<name>-5173.app.github.dev)
-    allow_origin_regex=r"https://.*\.app\.github\.dev",
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", *_extra_origins],
+    # Codespaces/Gitpod-style forwarded preview URLs (e.g. https://<name>-5173.app.github.dev),
+    # plus any Vercel deployment (production and per-branch/PR preview URLs alike, e.g.
+    # https://greenhouse-digital-twin-git-feature-x.vercel.app).
+    allow_origin_regex=r"https://.*\.app\.github\.dev|https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -183,6 +191,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
                 "rh_in_pct": "mean",
                 "vpd_kpa": "mean",
                 "fruit_fresh_yield_kg_m2": "last",
+                "climate_phase": "last",  # unchanged within a day (day-granularity phase boundary)
                 # Daily-average power draw (kW), i.e. normalized per hour — not a daily total —
                 # so it's directly comparable to the CHP's fixed max heat output below.
                 "heat_used_kw": "mean",
@@ -361,6 +370,7 @@ def simulate(overrides: SimulateRequest = SimulateRequest()) -> dict:
         "daily_series": [
             {
                 "date": row.timestamp.date().isoformat(),
+                "climate_phase": row.climate_phase,
                 "temp_in_c": round(row.temp_in_c, 2),
                 "temp_out_c": round(row.temp_out_c, 2),
                 "co2_in_ppm": round(row.co2_in_ppm, 1),
