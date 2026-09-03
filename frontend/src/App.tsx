@@ -773,7 +773,6 @@ function App() {
               rhPct={viewedDay?.rh_in_pct ?? null}
               vpdKpa={viewedDay?.vpd_kpa ?? null}
               co2Ppm={viewedDay?.co2_in_ppm ?? null}
-              screenSavingPct={config ? config.climate_control.screen_energy_saving_fraction * 100 : 55}
               screenDeployedPct={result?.summary.screen_deployed_pct ?? null}
               dehumidSetpointPct={sliderValues.dehumidification_setpoint_pct}
               yieldKgM2={viewedDay?.marketable_yield_kg_m2 ?? null}
@@ -791,10 +790,6 @@ function App() {
               <StatTile
                 label="Θερμική κατανάλωση"
                 value={`${result.summary.total_heat_used_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`}
-              />
-              <StatTile
-                label="Εξοικονόμηση από κουρτίνα"
-                value={`${result.summary.heat_loss_avoided_kwh.toLocaleString(undefined, { maximumFractionDigits: 0 })} kWh`}
               />
               <StatTile
                 label="Ηλεκτρική κατανάλωση (δίκτυο)"

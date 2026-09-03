@@ -37,8 +37,6 @@ interface GreenhouseSchematicProps {
   rhPct: number | null;
   vpdKpa: number | null;
   co2Ppm: number | null;
-  /** Fixed product spec (not user-adjustable) — see docs/assumptions/climate-control.md. */
-  screenSavingPct: number;
   /** Season-average % of hours the screen was deployed — fully automatic, no user control. */
   screenDeployedPct: number | null;
   dehumidSetpointPct: number;
@@ -57,7 +55,6 @@ export function GreenhouseSchematic({
   rhPct,
   vpdKpa,
   co2Ppm,
-  screenSavingPct,
   screenDeployedPct,
   dehumidSetpointPct,
   yieldKgM2,
@@ -71,13 +68,9 @@ export function GreenhouseSchematic({
     { x: 400, y: 145, label: "RH", value: fmt(rhPct, 0, "%"), anchor: "start" },
     { x: 400, y: 163, label: "VPD", value: fmt(vpdKpa, 2, " kPa"), anchor: "start" },
     { x: 400, y: 181, label: "CO₂", value: fmt(co2Ppm, 0, " ppm"), anchor: "start" },
-    // Screen saving % is a fixed product spec, not a live/adjustable value —
-    // shown as "σταθερό" (fixed); the schedule pin below it is the one thing
-    // the user actually controls.
-    { x: 100, y: 84, label: "Εξοικονόμηση (σταθερό)", value: `${screenSavingPct.toFixed(0)}%`, anchor: "start" },
     {
       x: 100,
-      y: 96,
+      y: 90,
       label: "Κλειστή",
       value: screenDeployedPct === null ? "αυτόματα (νύχτα/ζέστη/κρύο)" : `${screenDeployedPct.toFixed(0)}% του χρόνου`,
       anchor: "start",
