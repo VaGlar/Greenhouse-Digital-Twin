@@ -8,6 +8,7 @@ edits per run. The frontend only triggers a simulation and reads results.
 from __future__ import annotations
 
 import copy
+import os
 from datetime import date
 from pathlib import Path
 
@@ -27,11 +28,18 @@ DEFAULT_CONFIG_PATH = REPO_ROOT / "config" / "greenhouse_example.yaml"
 
 app = FastAPI(title="Greenhouse Digital Twin API")
 
+# Deployed frontend origin (e.g. https://greenhouse-digital-twin.vercel.app), set as an env var
+# on the backend host -- not known at code-time, so it isn't hardcoded like the local dev
+# origins below. Comma-separated so a custom domain can be added alongside the *.vercel.app one.
+_extra_origins = [o.strip() for o in os.environ.get("FRONTEND_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    # Codespaces/Gitpod-style forwarded preview URLs (e.g. https://<name>-5173.app.github.dev)
-    allow_origin_regex=r"https://.*\.app\.github\.dev",
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", *_extra_origins],
+    # Codespaces/Gitpod-style forwarded preview URLs (e.g. https://<name>-5173.app.github.dev),
+    # plus any Vercel deployment (production and per-branch/PR preview URLs alike, e.g.
+    # https://greenhouse-digital-twin-git-feature-x.vercel.app).
+    allow_origin_regex=r"https://.*\.app\.github\.dev|https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
